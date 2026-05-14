@@ -385,7 +385,7 @@ class DockerTop:
         return (cid_short, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending)
 
     def draw_cols(self, w, y, x, width):
-        cols = " ID           NAME                      STATUS       CPU    MEM    MEM USAGE          NET I/O            BLOCK I/O          PIDS"
+        cols = (f" {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU':<5} {'MEM':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
         if width < len(cols):
             cols = cols[:width]
         try:

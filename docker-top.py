@@ -615,6 +615,8 @@ class DockerTop:
         if self.is_filtering:
             if key in (27, 9):
                 self.is_filtering = False
+                if key == 27:
+                    self.filter_text = ""
             elif key in (10, 13, ord('\n'), curses.KEY_ENTER):
                 self.is_filtering = False
             elif key in (curses.KEY_BACKSPACE, 127, 8, 263):
@@ -636,6 +638,10 @@ class DockerTop:
         # quit
         if key in (ord('q'), ord('Q')):
             self.running = False
+
+        # esc: clear filter, message, or selection state
+        elif key == 27:
+            self.filter_text = ""
 
         # command mode trigger
         elif key == ord(':'):

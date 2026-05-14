@@ -174,6 +174,7 @@ class DockerTop:
         # images data
         self._bg_images = []
         self._bg_images_dirty = False
+        self._sel_images = set()
         threading.Thread(target=self._bg_images_refresh, daemon=True).start()
 
         self.hdr_h = 1
@@ -324,9 +325,11 @@ class DockerTop:
             size = img.get('Size', '?')
             created = img.get('CreatedAt', '?')
             iid_short = iid[:19] if len(iid) > 19 else iid
+            sel_key = iid_short
+            selected = sel_key in self._sel_images
             if ft and ft not in repo.lower() and ft not in tag.lower():
                 continue
-            lines.append(('irow', (repo, tag, iid_short, size, created)))
+            lines.append(('irow', (repo, tag, iid_short, size, created, selected)))
         if len(lines) == 1:
             lines.append(('empty', ' No images found'))
         return lines
@@ -599,18 +602,25 @@ class DockerTop:
                     except Exception:
                         pass
                 elif lt == 'irow':
-                    repo, tag, iid, size, created = data
+                    repo, tag, iid, size, created, selected = data
+                    sel_flag = ">\u2502" if selected else " \u2502"
                     repo = repo[:22].ljust(22) if len(repo) > 22 else repo.ljust(22)
                     tag = tag[:18].ljust(18) if len(tag) > 18 else tag.ljust(18)
                     iid = iid[:19].ljust(19) if len(iid) > 19 else iid.ljust(19)
                     size_s = str(size)[:14].ljust(14) if len(str(size)) > 14 else str(size).ljust(14)
                     created_s = str(created)[:14].ljust(14) if len(str(created)) > 14 else str(created).ljust(14)
                     fmt = f" {repo} {tag} {iid} {size_s} {created_s}"
-                    if len(fmt) > w:
-                        fmt = fmt[:w]
-                    attr = curses.A_REVERSE if abs_idx == self.selected_idx else curses.A_NORMAL
+                    if len(fmt) > w - 2:
+                        fmt = fmt[:w - 2]
+                    if abs_idx == self.selected_idx:
+                        attr = curses.A_REVERSE
+                    elif selected:
+                        attr = curses.color_pair(4) | curses.A_BOLD
+                    else:
+                        attr = curses.A_NORMAL
                     try:
-                        self.stdscr.addstr(yy, 0, fmt, attr)
+                        self.stdscr.addstr(yy, 0, sel_flag, attr)
+                        self.stdscr.addstr(yy, 2, fmt, attr)
                     except Exception:
                         pass
                 elif lt == 'spacer':
@@ -691,8 +701,11 @@ class DockerTop:
                        f"  |  [e]sh [>]log [<]cfg")
             elif self.tab == 1:
                 count = len(self._bg_images)
-                st = (f" {sel_tag}  |  {count} images  |  "
-                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
+                sel_count = len(self._sel_images)
+                sel_info = f"  |  {sel_count} selected" if sel_count else ""
+                st = (f" {sel_tag}  |  {count} images{sel_info}  |  "
+                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}"
+                       f"  |  [Space]sel [u]clear [a]all")
             else:
                 st = (f" {sel_tag} {sel_state}  |  {self.container_count} containers  |  "
                        f"lines {self.scroll_offset+1}-{self.scroll_offset+len(visible)}/{self.total_lines}  |  "
@@ -791,6 +804,7 @@ class DockerTop:
                 self._direct_refresh()
             else:
                 self._bg_images = get_images()
+                self._sel_images.clear()
             self.message = "Refreshed!"
             self.message_ts = time.time()
 
@@ -803,7 +817,7 @@ class DockerTop:
             new = self.find_prev_row()
             if new != self.selected_idx:
                 self.selected_idx = new
-        elif key in (curses.KEY_NPAGE, ord(' ')):
+        elif key in (curses.KEY_NPAGE,):
             ch = self.content_height()
             for _ in range(ch):
                 new = self.find_next_row()
@@ -966,6 +980,38 @@ class DockerTop:
                     self._suspend_and_run(
                         ['sh', '-c', f'docker inspect {cid} | less -R'])
 
+        # space -> page down (main) or toggle image selection (images)
+        elif key == ord(' '):
+            if self.tab == 1:
+                sel = self.get_selected()
+                if sel and sel[0] == 'image':
+                    iid = sel[1][2].strip()
+                    if iid in self._sel_images:
+                        self._sel_images.discard(iid)
+                    else:
+                        self._sel_images.add(iid)
+            else:
+                ch = self.content_height()
+                for _ in range(ch):
+                    new = self.find_next_row()
+                    if new == self.selected_idx:
+                        break
+                    self.selected_idx = new
+
+        # u -> clear all image selections
+        elif key in (ord('u'),):
+            if self.tab == 1:
+                self._sel_images.clear()
+
+        # a -> select all images
+        elif key in (ord('a'),):
+            if self.tab == 1:
+                self._sel_images.clear()
+                for img in self._bg_images:
+                    iid = img.get('ID', '')
+                    iid_short = iid[:19] if len(iid) > 19 else iid
+                    self._sel_images.add(iid_short)
+
         # help
         elif key in (ord('h'), ord('H'), ord('?')):
             self.show_help()
@@ -985,6 +1031,11 @@ class DockerTop:
             "",
             " TABS",
             "  Tab            Switch between Main (containers) and Images views",
+            "",
+            " IMAGE SELECTION (Images tab)",
+            "  Space          Toggle selection on current image",
+            "  a              Select all images",
+            "  u              Clear all selections",
             "",
             " FILTERING",
             "  f / F / /       Enter filter mode (type to filter by name or project)",

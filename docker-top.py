@@ -136,6 +136,10 @@ class DockerTop:
             curses.curs_set(0)
         except Exception:
             pass
+        try:
+            curses.set_escdelay(25)
+        except Exception:
+            pass
         self.stdscr.nodelay(1)
 
         # streaming docker stats (persistent connection, no repeated overhead)

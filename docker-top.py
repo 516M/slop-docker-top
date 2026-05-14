@@ -510,24 +510,26 @@ class DockerTop:
         ch = self.content_height()
         ft = self.ftr_h
 
-        # header
+        # header — draw tabs with distinct styling
+        hdr_base = f" docker-top v{VERSION} "
+        binds = (f"[q]:q uit  [f]/ filter  [r]efresh  "
+                 f"[s]top [S]tart [R]estart  [d]elete  [p]ause [P]unpause  "
+                 f"[\u2191\u2193/j/k]sel  [h]elp")
         tab_labels = ["Main", "Images"]
-        tabs = ""
-        for i, label in enumerate(tab_labels):
-            if i == self.tab:
-                tabs += f" [{label}] "
-            else:
-                tabs += f" {label} "
-        hdr = (f" docker-top v{VERSION}{tabs} "
-               f"[q]:q uit  [f]/ filter  [r]efresh  "
-               f"[s]top [S]tart [R]estart  [d]elete  [p]ause [P]unpause  "
-               f"[\u2191\u2193/j/k]sel  [h]elp")
-        if len(hdr) > w:
-            hdr = hdr[:w]
+        x = 0
         try:
-            self.stdscr.addstr(0, 0, hdr, curses.color_pair(6))
+            self.stdscr.addstr(0, x, hdr_base, curses.color_pair(6))
+            x += len(hdr_base)
+            for i, label in enumerate(tab_labels):
+                tab = f" {label} "
+                if i == self.tab:
+                    self.stdscr.addstr(0, x, tab, curses.color_pair(6) | curses.A_REVERSE)
+                else:
+                    self.stdscr.addstr(0, x, tab, curses.A_DIM)
+                x += len(tab)
+            self.stdscr.addstr(0, x, f" {binds}", curses.color_pair(6))
         except Exception:
-            self.stdscr.addstr(0, 0, hdr[:w])
+            self.stdscr.addstr(0, 0, (hdr_base + " ".join(tab_labels) + " " + binds)[:w])
 
         # build display lines
         self.display_lines = self.build_display_lines()

@@ -12,7 +12,7 @@ import time
 import re
 from collections import defaultdict, OrderedDict
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 REFRESH_INTERVAL = 2
 
 
@@ -77,6 +77,18 @@ def group_by_project(containers):
     return result
 
 
+def get_images():
+    lines = run_cmd(['docker', 'images', '--format', '{{json .}}'])
+    images = []
+    for line in lines:
+        try:
+            img = json.loads(line)
+            images.append(img)
+        except (json.JSONDecodeError, ValueError):
+            continue
+    return images
+
+
 def short_status(state, status):
     s = status.lower()
     if state == 'running':
@@ -119,6 +131,7 @@ class DockerTop:
         self.total_lines = 0
         self.container_count = 0
         self._loading = True
+        self.tab = 0  # 0 = Main, 1 = Images
 
         curses.start_color()
         curses.use_default_colors()
@@ -157,6 +170,11 @@ class DockerTop:
         # async action tracking
         self._pending = []
         self._pending_lock = threading.Lock()
+
+        # images data
+        self._bg_images = []
+        self._bg_images_dirty = False
+        threading.Thread(target=self._bg_images_refresh, daemon=True).start()
 
         self.hdr_h = 1
         self.ftr_h = 1
@@ -201,6 +219,12 @@ class DockerTop:
             self._bg_dirty = True
             time.sleep(REFRESH_INTERVAL)
 
+    def _bg_images_refresh(self):
+        while self.running:
+            self._bg_images = get_images()
+            self._bg_images_dirty = True
+            time.sleep(REFRESH_INTERVAL * 2)
+
     def fetch_data(self):
         if self._bg_dirty:
             self._bg_dirty = False
@@ -244,6 +268,8 @@ class DockerTop:
         t.start()
 
     def build_display_lines(self):
+        if self.tab == 1:
+            return self._build_images_lines()
         lines = []
         self.container_count = 0
         ft = self.filter_text.lower().strip() if self.filter_text else ''
@@ -285,6 +311,24 @@ class DockerTop:
             else:
                 lines.append(('empty', ' No containers found'))
 
+        return lines
+
+    def _build_images_lines(self):
+        lines = []
+        ft = self.filter_text.lower().strip() if self.filter_text else ''
+        lines.append(('icolhdr', ''))
+        for img in self._bg_images:
+            repo = img.get('Repository', '<none>') or '<none>'
+            tag = img.get('Tag', '<none>') or '<none>'
+            iid = img.get('ID', '')
+            size = img.get('Size', '?')
+            created = img.get('CreatedAt', '?')
+            iid_short = iid[:19] if len(iid) > 19 else iid
+            if ft and ft not in repo.lower() and ft not in tag.lower():
+                continue
+            lines.append(('irow', (repo, tag, iid_short, size, created)))
+        if len(lines) == 1:
+            lines.append(('empty', ' No images found'))
         return lines
 
     def render_row(self, c):
@@ -361,7 +405,7 @@ class DockerTop:
             pass
 
     def _is_selectable(self, lt):
-        return lt in ('row', 'pheader')
+        return lt in ('row', 'pheader', 'irow')
 
     def find_prev_row(self):
         idx = self.selected_idx - 1
@@ -401,6 +445,8 @@ class DockerTop:
                 if raw.startswith('Project: '):
                     return ('project', raw[len('Project: '):])
                 return ('project', raw)
+            if lt == 'irow':
+                return ('image', data)
         return None
 
     def blocking_confirm(self, prompt):
@@ -465,7 +511,15 @@ class DockerTop:
         ft = self.ftr_h
 
         # header
-        hdr = (f" docker-top v{VERSION}  |  [q]:q uit  [f]/ filter  [r]efresh  "
+        tab_labels = ["Main", "Images"]
+        tabs = ""
+        for i, label in enumerate(tab_labels):
+            if i == self.tab:
+                tabs += f" [{label}] "
+            else:
+                tabs += f" {label} "
+        hdr = (f" docker-top v{VERSION}{tabs} "
+               f"[q]:q uit  [f]/ filter  [r]efresh  "
                f"[s]top [S]tart [R]estart  [d]elete  [p]ause [P]unpause  "
                f"[\u2191\u2193/j/k]sel  [h]elp")
         if len(hdr) > w:
@@ -534,6 +588,29 @@ class DockerTop:
                 elif lt == 'row':
                     row = self.render_row(data)
                     self.draw_row(self.stdscr, yy, 0, w, row, selected=(abs_idx == self.selected_idx))
+                elif lt == 'icolhdr':
+                    cols = " REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
+                    if len(cols) > w:
+                        cols = cols[:w]
+                    try:
+                        self.stdscr.addstr(yy, 0, cols, curses.color_pair(5) | curses.A_BOLD)
+                    except Exception:
+                        pass
+                elif lt == 'irow':
+                    repo, tag, iid, size, created = data
+                    repo = repo[:22].ljust(22) if len(repo) > 22 else repo.ljust(22)
+                    tag = tag[:18].ljust(18) if len(tag) > 18 else tag.ljust(18)
+                    iid = iid[:19].ljust(19) if len(iid) > 19 else iid.ljust(19)
+                    size_s = str(size)[:14].ljust(14) if len(str(size)) > 14 else str(size).ljust(14)
+                    created_s = str(created)[:14].ljust(14) if len(str(created)) > 14 else str(created).ljust(14)
+                    fmt = f" {repo} {tag} {iid} {size_s} {created_s}"
+                    if len(fmt) > w:
+                        fmt = fmt[:w]
+                    attr = curses.A_REVERSE if abs_idx == self.selected_idx else curses.A_NORMAL
+                    try:
+                        self.stdscr.addstr(yy, 0, fmt, attr)
+                    except Exception:
+                        pass
                 elif lt == 'spacer':
                     pass
                 elif lt == 'empty':
@@ -558,6 +635,9 @@ class DockerTop:
                 sel_state = data.get('State', '')
             elif kind == 'project':
                 sel_name = f"[Project] {data}"
+                sel_state = ''
+            elif kind == 'image':
+                sel_name = f"[Image] {data[0]}:{data[1]}"
                 sel_state = ''
 
         show_interactive = (sel and kind == 'container' and sel_state == 'running')
@@ -607,6 +687,10 @@ class DockerTop:
                        f"  |  {self.container_count} containers  |  "
                        f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}"
                        f"  |  [e]sh [>]log [<]cfg")
+            elif self.tab == 1:
+                count = len(self._bg_images)
+                st = (f" {sel_tag}  |  {count} images  |  "
+                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
             else:
                 st = (f" {sel_tag} {sel_state}  |  {self.container_count} containers  |  "
                        f"lines {self.scroll_offset+1}-{self.scroll_offset+len(visible)}/{self.total_lines}  |  "
@@ -675,8 +759,15 @@ class DockerTop:
             return
 
         # --- normal mode ---
+        # tab switching
+        if key in (9, 353):
+            self.tab = 1 - self.tab
+            self.filter_text = ""
+            self.selected_idx = 0
+            self.scroll_offset = 0
+
         # quit
-        if key in (ord('q'), ord('Q')):
+        elif key in (ord('q'), ord('Q')):
             self.running = False
 
         # esc: clear filter, message, or selection state
@@ -694,7 +785,10 @@ class DockerTop:
 
         # refresh
         elif key in (ord('r'),):
-            self._direct_refresh()
+            if self.tab == 0:
+                self._direct_refresh()
+            else:
+                self._bg_images = get_images()
             self.message = "Refreshed!"
             self.message_ts = time.time()
 
@@ -886,6 +980,9 @@ class DockerTop:
             "  \u2191/k / \u2193/j     Move selection up/down (project headers too)",
             "  PgUp / PgDown   Move selection up/down one page",
             "  g / G           Jump to first/last item",
+            "",
+            " TABS",
+            "  Tab            Switch between Main (containers) and Images views",
             "",
             " FILTERING",
             "  f / F / /       Enter filter mode (type to filter by name or project)",

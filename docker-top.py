@@ -261,10 +261,10 @@ class DockerTop:
 
             if project:
                 header = f" Project: {project}"
+                lines.append(('pheader', header))
             else:
                 header = " Standalone containers"
-
-            lines.append(('pheader', header))
+                lines.append(('sheader', header))
             lines.append(('sep', ''))
 
             if not fcontainers:
@@ -359,17 +359,13 @@ class DockerTop:
         except Exception:
             pass
 
-    def _is_selectable(self, lt, idx=None):
-        if lt == 'pheader' and idx is not None:
-            raw = str(self.display_lines[idx][1]).strip()
-            if raw.startswith('Standalone'):
-                return False
+    def _is_selectable(self, lt):
         return lt in ('row', 'pheader')
 
     def find_prev_row(self):
         idx = self.selected_idx - 1
         while idx >= 0:
-            if self._is_selectable(self.display_lines[idx][0], idx):
+            if self._is_selectable(self.display_lines[idx][0]):
                 return idx
             idx -= 1
         return self.selected_idx
@@ -377,20 +373,20 @@ class DockerTop:
     def find_next_row(self):
         idx = self.selected_idx + 1
         while idx < len(self.display_lines):
-            if self._is_selectable(self.display_lines[idx][0], idx):
+            if self._is_selectable(self.display_lines[idx][0]):
                 return idx
             idx += 1
         return self.selected_idx
 
     def find_first_row(self):
         for idx in range(len(self.display_lines)):
-            if self._is_selectable(self.display_lines[idx][0], idx):
+            if self._is_selectable(self.display_lines[idx][0]):
                 return idx
         return 0
 
     def find_last_row(self):
         for idx in range(len(self.display_lines) - 1, -1, -1):
-            if self._is_selectable(self.display_lines[idx][0], idx):
+            if self._is_selectable(self.display_lines[idx][0]):
                 return idx
         return 0
 
@@ -519,6 +515,11 @@ class DockerTop:
             try:
                 if lt == 'pheader':
                     attr = curses.color_pair(1) | curses.A_BOLD
+                    if abs_idx == self.selected_idx:
+                        attr = curses.A_REVERSE
+                    self.stdscr.addstr(yy, 0, str(data)[:w], attr)
+                elif lt == 'sheader':
+                    attr = curses.A_DIM
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
                     self.stdscr.addstr(yy, 0, str(data)[:w], attr)

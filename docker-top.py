@@ -558,6 +558,8 @@ class DockerTop:
                 sel_name = f"[Project] {data}"
                 sel_state = ''
 
+        show_interactive = (sel and kind == 'container' and sel_state == 'running')
+
 
         # show pending actions with spinner
         with self._pending_lock:
@@ -598,9 +600,13 @@ class DockerTop:
                 pass
         else:
             sel_tag = f"[{sel_name}]" if sel_name and not sel_name.startswith('[') else sel_name
-            st = (f" {sel_tag} {sel_state}  |  {self.container_count} containers  |  "
-                   f"lines {self.scroll_offset+1}-{self.scroll_offset+len(visible)}/{self.total_lines}  |  "
-                   f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
+            if show_interactive:
+                st = (f" {sel_tag} running  \u21b5sh \u2192log \u2190cfg"
+                       f"  |  filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
+            else:
+                st = (f" {sel_tag} {sel_state}  |  {self.container_count} containers  |  "
+                       f"lines {self.scroll_offset+1}-{self.scroll_offset+len(visible)}/{self.total_lines}  |  "
+                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
             if len(st) > w:
                 st = st[:w]
             try:

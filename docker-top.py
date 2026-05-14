@@ -603,7 +603,8 @@ class DockerTop:
             if show_interactive:
                 st = (f" {sel_tag} running"
                        f"  |  {self.container_count} containers  |  "
-                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
+                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}"
+                       f"  |  [e]sh [>]log [<]cfg")
             else:
                 st = (f" {sel_tag} {sel_state}  |  {self.container_count} containers  |  "
                        f"lines {self.scroll_offset+1}-{self.scroll_offset+len(visible)}/{self.total_lines}  |  "
@@ -614,13 +615,6 @@ class DockerTop:
                 self.stdscr.addstr(h - ft, 0, st, curses.A_DIM)
             except Exception:
                 pass
-            if show_interactive:
-                legend = f" \u21b5sh \u2192log \u2190cfg"
-                lx = max(0, w - len(legend) - 1)
-                try:
-                    self.stdscr.addstr(h - ft, lx, legend, curses.color_pair(4) | curses.A_BOLD)
-                except Exception:
-                    pass
 
         self.stdscr.refresh()
 

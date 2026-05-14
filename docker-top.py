@@ -12,7 +12,7 @@ import time
 import re
 from collections import defaultdict, OrderedDict
 
-VERSION = "1.7.0"
+VERSION = "2.0.0"
 REFRESH_INTERVAL = 2
 
 
@@ -156,6 +156,13 @@ class DockerTop:
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
         curses.init_pair(9, curses.COLOR_MAGENTA, -1)
         curses.init_pair(10, curses.COLOR_WHITE, curses.COLOR_BLACK)
+        # modern extras (gracefully degrade if 256-color unsupported)
+        if curses.COLORS >= 256:
+            curses.init_pair(11, -1, 236)   # zebra stripe (dark gray)
+            curses.init_pair(12, -1, 24)    # selection (dark cyan-blue)
+        else:
+            curses.init_pair(11, -1, -1)    # no zebra on basic terminals
+            curses.init_pair(12, 7, 4)      # selection: white on blue
 
         try:
             curses.curs_set(0)
@@ -393,7 +400,7 @@ class DockerTop:
         except Exception:
             pass
 
-    def draw_row(self, w, y, x, width, row_data, selected=False):
+    def draw_row(self, w, y, x, width, row_data, selected=False, zebra=False):
         cid, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending = row_data
         n = name[:22].ljust(22) if len(name) > 22 else name.ljust(22)
         c = cid[:12].ljust(12)
@@ -403,7 +410,9 @@ class DockerTop:
             fmt = fmt[:width]
 
         if selected:
-            attr = curses.A_REVERSE
+            attr = curses.color_pair(12)
+        elif zebra:
+            attr = curses.color_pair(11)
         elif pending:
             attr = curses.color_pair(4) | curses.A_BOLD
         elif state in ('running',):
@@ -526,15 +535,15 @@ class DockerTop:
         ch = self.content_height()
         ft = self.ftr_h
 
-        # header — draw tabs with distinct styling
-        hdr_base = f" docker-top v{VERSION} "
-        binds = (f"[q]:q uit  [f]/ filter  [r]efresh  "
-                 f"[s]top [S]tart [R]estart  [d]elete  [p]ause [P]unpause  "
-                 f"[\u2191\u2193/j/k]sel  [h]elp")
+        # header
+        hdr_base = f" docker-top "
+        binds = (f"q:quit  f:filter  r:refresh  "
+                 f"s:stop S:start R:restart d:rm p:pause P:un  "
+                 f"\u2191\u2193:sel  h:help")
         tab_labels = ["Main", "Images"]
         x = 0
         try:
-            self.stdscr.addstr(0, x, hdr_base, curses.color_pair(6))
+            self.stdscr.addstr(0, x, hdr_base, curses.color_pair(6) | curses.A_BOLD)
             x += len(hdr_base)
             for i, label in enumerate(tab_labels):
                 tab = f" {label} "
@@ -543,9 +552,9 @@ class DockerTop:
                 else:
                     self.stdscr.addstr(0, x, tab, curses.A_DIM)
                 x += len(tab)
-            self.stdscr.addstr(0, x, f" {binds}", curses.color_pair(6))
+            self.stdscr.addstr(0, x, f"  {binds}", curses.color_pair(6))
         except Exception:
-            self.stdscr.addstr(0, 0, (hdr_base + " ".join(tab_labels) + " " + binds)[:w])
+            self.stdscr.addstr(0, 0, (hdr_base + " ".join(tab_labels) + "  " + binds)[:w])
 
         # build display lines
         self.display_lines = self.build_display_lines()
@@ -579,6 +588,7 @@ class DockerTop:
             except Exception:
                 pass
 
+        row_idx = 0
         for i, (lt, data) in enumerate(visible):
             yy = self.hdr_h + i
             if yy >= h - ft:
@@ -589,12 +599,12 @@ class DockerTop:
                 if lt == 'pheader':
                     attr = curses.color_pair(10)
                     if abs_idx == self.selected_idx:
-                        attr = curses.A_REVERSE
+                        attr = curses.color_pair(12)
                     self.stdscr.addstr(yy, 0, str(data)[:w], attr)
                 elif lt == 'sheader':
                     attr = curses.A_DIM
                     if abs_idx == self.selected_idx:
-                        attr = curses.A_REVERSE
+                        attr = curses.color_pair(12)
                     self.stdscr.addstr(yy, 0, str(data)[:w], attr)
                 elif lt == 'sep':
                     sep = " \u2500" * ((w - 2) // 2)
@@ -605,7 +615,10 @@ class DockerTop:
                     self.draw_cols(self.stdscr, yy, 0, w)
                 elif lt == 'row':
                     row = self.render_row(data)
-                    self.draw_row(self.stdscr, yy, 0, w, row, selected=(abs_idx == self.selected_idx))
+                    self.draw_row(self.stdscr, yy, 0, w, row,
+                                  selected=(abs_idx == self.selected_idx),
+                                  zebra=(row_idx % 2 == 0))
+                    row_idx += 1
                 elif lt == 'icolhdr':
                     cols = " REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
                     if len(cols) > w:
@@ -615,8 +628,10 @@ class DockerTop:
                     except Exception:
                         pass
                 elif lt == 'irow':
-                    repo, tag, iid, size, created, selected = data
-                    sel_flag = ">\u2502" if selected else " \u2502"
+                    repo, tag, iid, size, created, sel_state = data
+                    flag = " \u2502"
+                    if sel_state:
+                        flag = ">\u2502"
                     repo = repo[:22].ljust(22) if len(repo) > 22 else repo.ljust(22)
                     tag = tag[:18].ljust(18) if len(tag) > 18 else tag.ljust(18)
                     iid = iid[:19].ljust(19) if len(iid) > 19 else iid.ljust(19)
@@ -626,13 +641,15 @@ class DockerTop:
                     if len(fmt) > w - 2:
                         fmt = fmt[:w - 2]
                     if abs_idx == self.selected_idx:
-                        attr = curses.A_REVERSE
-                    elif selected:
+                        attr = curses.color_pair(12)
+                    elif sel_state:
                         attr = curses.color_pair(4) | curses.A_BOLD
+                    elif row_idx % 2 == 0:
+                        attr = curses.color_pair(11)
                     else:
                         attr = curses.A_NORMAL
                     try:
-                        self.stdscr.addstr(yy, 0, sel_flag, attr)
+                        self.stdscr.addstr(yy, 0, flag, attr)
                         self.stdscr.addstr(yy, 2, fmt, attr)
                     except Exception:
                         pass
@@ -667,8 +684,7 @@ class DockerTop:
 
         show_interactive = (sel and kind == 'container' and sel_state == 'running')
 
-
-        # show pending actions with spinner
+        # pending action spinner
         with self._pending_lock:
             has_pending = bool(self._pending)
 
@@ -685,16 +701,16 @@ class DockerTop:
             except Exception:
                 pass
         elif self.is_filtering:
-            prompt = f" Filter: {self.filter_text}\u2588"
+            prompt = f" filter: {self.filter_text}\u2588"
             if len(prompt) > w:
                 prompt = prompt[:w]
             try:
-                self.stdscr.addstr(h - ft, 0, prompt, curses.A_REVERSE)
+                self.stdscr.addstr(h - ft, 0, prompt, curses.color_pair(8))
             except Exception:
                 pass
         elif self.command_mode:
             try:
-                self.stdscr.addstr(h - ft, 0, ":".ljust(w-1), curses.color_pair(9))
+                self.stdscr.addstr(h - ft, 0, ":", curses.color_pair(9))
             except Exception:
                 pass
         elif self.message and time.time() - self.message_ts < 4:
@@ -708,21 +724,20 @@ class DockerTop:
         else:
             sel_tag = f"[{sel_name}]" if sel_name and not sel_name.startswith('[') else sel_name
             if show_interactive:
-                st = (f" {sel_tag} running"
-                       f"  |  {self.container_count} containers  |  "
-                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}"
-                       f"  |  [e]sh [>]log [<]cfg")
+                st = (f" {sel_tag}  {self.container_count}ct  "
+                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '-'}"
+                       f"  e:sh >:log <:cfg")
             elif self.tab == 1:
                 count = len(self._bg_images)
                 sel_count = len(self._sel_images)
-                sel_info = f"  |  {sel_count} selected" if sel_count else ""
-                st = (f" {sel_tag}  |  {count} images{sel_info}  |  "
-                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}"
-                       f"  |  [Space]sel [u]clear [a]all")
+                sel_info = f"  {sel_count}sel" if sel_count else ""
+                st = (f" {sel_tag}  {count}img{sel_info}"
+                       f"  filter: {'\"' + self.filter_text + '\"' if self.filter_text else '-'}"
+                       f"  Space:sel u:clear a:all")
             else:
-                st = (f" {sel_tag} {sel_state}  |  {self.container_count} containers  |  "
-                       f"lines {self.scroll_offset+1}-{self.scroll_offset+len(visible)}/{self.total_lines}  |  "
-                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
+                st = (f" {sel_tag} {sel_state}  {self.container_count}ct  "
+                       f"L{self.scroll_offset+1}-{self.scroll_offset+len(visible)}/{self.total_lines}  "
+                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '-'}")
             if len(st) > w:
                 st = st[:w]
             try:

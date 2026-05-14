@@ -432,6 +432,32 @@ class DockerTop:
                     pass
                 return False
 
+    def _suspend_and_run(self, cmd_list):
+        """Suspend curses TUI, run a terminal command, then resume."""
+        self.stdscr.nodelay(0)
+        curses.echo()
+        curses.nocbreak()
+        try:
+            curses.curs_set(1)
+        except Exception:
+            pass
+        curses.endwin()
+
+        try:
+            subprocess.run(cmd_list, check=False)
+        finally:
+            curses.cbreak()
+            curses.noecho()
+            self.stdscr.nodelay(1)
+            try:
+                curses.curs_set(0)
+            except Exception:
+                pass
+            self.height, self.width = self.stdscr.getmaxyx()
+            self._direct_refresh()
+            self.stdscr.clear()
+            self.stdscr.refresh()
+
     def draw(self):
         h, w = self.height, self.width = self.stdscr.getmaxyx()
         ch = self.content_height()
@@ -789,6 +815,47 @@ class DockerTop:
                     self._enqueue_action(f"Removing project {pname}",
                                          ['docker', 'compose', '-p', pname, 'down'])
 
+        # enter -> container shell
+        elif key in (10, 13, ord('\n'), 343, curses.KEY_ENTER):
+            sel = self.get_selected()
+            if sel:
+                kind, data = sel
+                if kind == 'container':
+                    name = data.get('Names', '?')
+                    cid = data.get('ID', '')
+                    if data.get('State') != 'running':
+                        self.message = f"{name} is not running"
+                        self.message_ts = time.time()
+                    else:
+                        self._suspend_and_run(
+                            ['docker', 'exec', '-it', cid, '/bin/sh'])
+
+        # right -> container logs
+        elif key == curses.KEY_RIGHT:
+            sel = self.get_selected()
+            if sel:
+                kind, data = sel
+                if kind == 'container':
+                    name = data.get('Names', '?')
+                    cid = data.get('ID', '')
+                    if data.get('State') != 'running':
+                        self.message = f"{name} is not running"
+                        self.message_ts = time.time()
+                    else:
+                        self._suspend_and_run(
+                            ['sh', '-c', f'docker logs -f {cid} 2>&1 | less -R +F'])
+
+        # left -> container inspect
+        elif key == curses.KEY_LEFT:
+            sel = self.get_selected()
+            if sel:
+                kind, data = sel
+                if kind == 'container':
+                    name = data.get('Names', '?')
+                    cid = data.get('ID', '')
+                    self._suspend_and_run(
+                        ['sh', '-c', f'docker inspect {cid} | less -R'])
+
         # help
         elif key in (ord('h'), ord('H'), ord('?')):
             self.show_help()
@@ -820,6 +887,12 @@ class DockerTop:
             "  p               Pause container",
             "  P               Unpause container",
             "  d               Remove container / docker compose down project",
+            "",
+            " INTERACTIVE (container row only)",
+            "  Enter           docker exec -it <container> /bin/sh",
+            "  \u2192 (Right)     docker logs -f <container> | less -R +F",
+            "  \u2190 (Left)     docker inspect <container> | less -R",
+            "                 (press q in less to return)",
             "",
             " MISC",
             "  r               Force refresh data",

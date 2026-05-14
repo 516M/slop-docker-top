@@ -131,6 +131,7 @@ class DockerTop:
         curses.init_pair(7, curses.COLOR_WHITE, curses.COLOR_GREEN)
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
         curses.init_pair(9, curses.COLOR_MAGENTA, -1)
+        curses.init_pair(10, curses.COLOR_WHITE, curses.COLOR_CYAN)
 
         try:
             curses.curs_set(0)
@@ -514,7 +515,7 @@ class DockerTop:
 
             try:
                 if lt == 'pheader':
-                    attr = curses.color_pair(1) | curses.A_BOLD
+                    attr = curses.color_pair(10)
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
                     self.stdscr.addstr(yy, 0, str(data)[:w], attr)

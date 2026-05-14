@@ -114,6 +114,17 @@ def short_status(state, status):
     return status[:10] if status else "?"
 
 
+def _pct_bar(val_str, width=5):
+    if val_str in ('-', 'N/A'):
+        return ' ' * width
+    try:
+        pct = float(val_str.replace('%', ''))
+    except (ValueError, AttributeError):
+        return ' ' * width
+    filled = max(0, min(width, round(pct / (100 / width))))
+    return '█' * filled + '░' * (width - filled)
+
+
 class DockerTop:
     def __init__(self, stdscr):
         self.stdscr = stdscr
@@ -144,10 +155,7 @@ class DockerTop:
         curses.init_pair(7, curses.COLOR_WHITE, curses.COLOR_GREEN)
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
         curses.init_pair(9, curses.COLOR_MAGENTA, -1)
-        if curses.COLORS >= 256:
-            curses.init_pair(10, curses.COLOR_YELLOW, 17)
-        else:
-            curses.init_pair(10, curses.COLOR_YELLOW, curses.COLOR_BLUE)
+        curses.init_pair(10, curses.COLOR_WHITE, curses.COLOR_BLACK)
 
         try:
             curses.curs_set(0)
@@ -372,10 +380,12 @@ class DockerTop:
                     pending = True
                     stat = p['label']
                     break
-        return (cid_short, name, stat, state, cpu, mem_p, mem_u, net, blk, pids, ports, image, pending)
+        cpu_bar = _pct_bar(cpu)
+        mem_bar = _pct_bar(mem_p)
+        return (cid_short, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending)
 
     def draw_cols(self, w, y, x, width):
-        cols = " ID           NAME                      STATUS       CPU%    MEM%     MEM USAGE          NET I/O            BLOCK I/O          PIDS"
+        cols = " ID           NAME                      STATUS       CPU    MEM    MEM USAGE          NET I/O            BLOCK I/O          PIDS"
         if width < len(cols):
             cols = cols[:width]
         try:
@@ -384,11 +394,11 @@ class DockerTop:
             pass
 
     def draw_row(self, w, y, x, width, row_data, selected=False):
-        cid, name, stat, state, cpu, mem_p, mem_u, net, blk, pids, ports, image, pending = row_data
+        cid, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending = row_data
         n = name[:22].ljust(22) if len(name) > 22 else name.ljust(22)
         c = cid[:12].ljust(12)
         s = stat[:12].ljust(12)
-        fmt = f" {c} {n} {s} {cpu:>7} {mem_p:>7} {mem_u:22} {net:18} {blk:18} {pids:>5}"
+        fmt = f" {c} {n} {s} {cpu_bar} {mem_bar} {mem_u:22} {net:18} {blk:18} {pids:>5}"
         if len(fmt) > width:
             fmt = fmt[:width]
 

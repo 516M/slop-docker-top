@@ -23,7 +23,25 @@ from collections import defaultdict, OrderedDict
 VERSION = "2.0.0"
 REFRESH_INTERVAL = 1
 
-_use_sudo = True
+_use_sudo = False
+
+def _detect_sudo():
+    """Check whether docker needs sudo and whether sudo is usable."""
+    global _use_sudo
+    try:
+        r = subprocess.run(['docker', 'ps'], capture_output=True, text=True, timeout=5)
+        if r.returncode == 0:
+            _use_sudo = False
+            return
+        if 'permission' in r.stderr.lower() or 'denied' in r.stderr.lower():
+            r2 = subprocess.run(['sudo', '-n', 'docker', 'ps'],
+                                capture_output=True, text=True, timeout=10)
+            if r2.returncode == 0:
+                _use_sudo = True
+                return
+    except Exception:
+        pass
+    _use_sudo = False
 
 def _maybe_sudo(cmd):
     if _use_sudo and cmd and cmd[0] == 'docker':
@@ -156,6 +174,8 @@ class DockerTop:
         except Exception:
             pass
         self.stdscr.nodelay(1)
+
+        _detect_sudo()
 
         self._stream_stats = {}
         self._stats_lock = threading.Lock()

@@ -457,12 +457,16 @@ class DockerTop:
         port_str = f"{ports:12}"
         suffix = f"{pids:>4}"
         fmt = prefix + port_str + suffix
-        if len(fmt) > width:
-            fmt = fmt[:width]
 
         if selected:
-            attr = curses.A_REVERSE
-        elif pending:
+            # fill the entire line width with reverse background
+            try:
+                w.addstr(y, x, fmt.ljust(width)[:width], curses.A_REVERSE)
+            except Exception:
+                pass
+            return
+
+        if pending:
             if stat.startswith('Stopping'):
                 attr = curses.color_pair(3) | curses.A_BOLD
             elif stat.startswith('Starting'):
@@ -479,7 +483,7 @@ class DockerTop:
             attr = curses.A_NORMAL
 
         try:
-            # draw prefix with state-based color, PORTS in cyan
+            # normal (non-selected): PORTS in cyan
             w.addstr(y, x, prefix, attr)
             w.addstr(y, x + len(prefix), port_str, curses.color_pair(1))
             w.addstr(y, x + len(prefix) + len(port_str), suffix, attr)
@@ -956,19 +960,27 @@ class DockerTop:
                     size_s = str(size)[:14].ljust(14) if len(str(size)) > 14 else str(size).ljust(14)
                     created_s = str(created)[:14].ljust(14) if len(str(created)) > 14 else str(created).ljust(14)
                     fmt = f"{lineno:<4} {repo} {tag} {iid} {size_s} {created_s}"
-                    if len(fmt) > w - 2:
-                        fmt = fmt[:w - 2]
                     if abs_idx == self.selected_idx:
-                        attr = curses.A_REVERSE
+                        flag = " " + chr(0x2502)
+                        if sel_state:
+                            flag = ">" + chr(0x2502)
+                        self.stdscr.addstr(yy, 0, flag, curses.A_REVERSE)
+                        self.stdscr.addstr(yy, 2, fmt.ljust(w - 2)[:w - 2], curses.A_REVERSE)
                     elif sel_state:
+                        fmt = fmt[:w - 2]
                         attr = curses.color_pair(4) | curses.A_BOLD
+                        try:
+                            self.stdscr.addstr(yy, 0, flag, attr)
+                            self.stdscr.addstr(yy, 2, fmt, attr)
+                        except Exception:
+                            pass
                     else:
-                        attr = curses.A_NORMAL
-                    try:
-                        self.stdscr.addstr(yy, 0, flag, attr)
-                        self.stdscr.addstr(yy, 2, fmt, attr)
-                    except Exception:
-                        pass
+                        fmt = fmt[:w - 2]
+                        try:
+                            self.stdscr.addstr(yy, 0, flag, curses.A_NORMAL)
+                            self.stdscr.addstr(yy, 2, fmt, curses.A_NORMAL)
+                        except Exception:
+                            pass
                 elif lt == 'blank':
                     pass
                 elif lt == 'empty':

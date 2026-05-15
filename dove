@@ -445,7 +445,7 @@ class DockerTop:
         return (cid_short, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports_display, image, pending)
 
     def draw_cols(self, w, y, x, width):
-        cols = (f"{'#':<4} {'ID':<12} {'NAME':<14} {'STATUS':<8} {'CPU%':>5} {'MEM%':>5} {'MEM USAGE':<10} {'PORTS':<12}{'PIDS':>4}")
+        cols = (f"{'#':<4} {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU%':>5} {'MEM%':>5} {'MEM USAGE':<18} {'PORTS':<20}{'PIDS':>4}")
         if self.scroll_x:
             cols = cols[self.scroll_x:]
         try:
@@ -455,11 +455,11 @@ class DockerTop:
 
     def draw_row(self, w, y, x, width, row_data, selected=False, lineno=0):
         cid, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending = row_data
-        n = name[:14].ljust(14) if len(name) > 14 else name.ljust(14)
+        n = name[:22].ljust(22) if len(name) > 22 else name.ljust(22)
         c = cid[:12].ljust(12)
-        s = stat[:8].ljust(8)
-        prefix = f"{lineno:<4} {c} {n} {s} {cpu_bar:>5} {mem_bar:>5} {mem_u:10} "
-        port_str = f"{ports:12}"
+        s = stat[:12].ljust(12)
+        prefix = f"{lineno:<4} {c} {n} {s} {cpu_bar:>5} {mem_bar:>5} {mem_u:18} "
+        port_str = f"{ports:20}"
         suffix = f"{pids:>4}"
         fmt = prefix + port_str + suffix
 

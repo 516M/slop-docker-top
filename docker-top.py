@@ -688,36 +688,102 @@ class DockerTop:
                 size_str = f"{total_bytes / 1024**2:.0f}M"
             else:
                 size_str = f"{total_bytes / 1024:.0f}K"
-            val_col = 14  # aligned column for values
-            try:
-                self.stdscr.addstr(0, 0, "  Images:", curses.color_pair(1))
-                self.stdscr.addstr(0, val_col, str(img_cnt), curses.A_BOLD)
-            except Exception:
-                pass
-            try:
-                self.stdscr.addstr(1, 0, "  Size:", curses.color_pair(1))
-                self.stdscr.addstr(1, val_col, size_str, curses.color_pair(19))
-            except Exception:
-                pass
-            line = 2
+
+            # largest image
+            largest_img = max(self._bg_images, key=lambda img: self._parse_size(img.get('Size', '0B')),
+                              default=None)
+            if largest_img:
+                l_repo = largest_img.get('Repository', '?')
+                l_tag = largest_img.get('Tag', '?')
+                l_size = largest_img.get('Size', '?')
+                if l_tag and l_tag != '<none>':
+                    largest_str = f"{l_repo}:{l_tag} ({l_size})"
+                else:
+                    largest_str = f"{l_repo} ({l_size})"
+                # trim if too long
+                max_l = 30
+                if len(largest_str) > max_l:
+                    largest_str = largest_str[:max_l - 1] + '\u2026'
+            else:
+                largest_str = ""
+
+            # oldest image by CreatedAt
+            oldest_img = min(self._bg_images, key=lambda img: img.get('CreatedAt', ''),
+                             default=None)
+            if oldest_img:
+                o_repo = oldest_img.get('Repository', '?')
+                o_tag = oldest_img.get('Tag', '?')
+                o_date = oldest_img.get('CreatedAt', '')
+                o_date_short = o_date.split(' ')[0] if ' ' in o_date else o_date[:10]
+                if o_tag and o_tag != '<none>':
+                    oldest_str = f"{o_date_short}  {o_repo}:{o_tag}"
+                else:
+                    oldest_str = f"{o_date_short}  {o_repo}"
+                max_l = 35
+                if len(oldest_str) > max_l:
+                    oldest_str = oldest_str[:max_l - 1] + '\u2026'
+            else:
+                oldest_str = ""
+
+            # unused images — not referenced by any container's Image field
+            used_images = set()
+            for project, containers in self.groups.items():
+                for c in containers:
+                    img = c.get('Image', '')
+                    if img:
+                        used_images.add(img)
+                        if ':' in img:
+                            used_images.add(img.split(':')[0])
+            unused_cnt = sum(1 for img in self._bg_images
+                             if img.get('Repository', '<none>') != '<none>'
+                             and img.get('Repository', '<none>') not in used_images
+                             and f"{img.get('Repository', '')}:{img.get('Tag', '')}" not in used_images)
+            unused_str = str(unused_cnt) if unused_cnt else ""
+
+            # two-column layout
+            val_col = 14
+            right_col = 36
+
+            def left_field(line, label, value, vattr=curses.A_NORMAL):
+                try:
+                    self.stdscr.addstr(line, 0, f"  {label}:", curses.color_pair(1))
+                    self.stdscr.addstr(line, val_col, value, vattr)
+                except Exception:
+                    pass
+
+            def right_field(line, label, value, vattr=curses.A_NORMAL):
+                try:
+                    start = right_col
+                    text = f"{label}:"
+                    self.stdscr.addstr(line, start, text, curses.color_pair(1))
+                    self.stdscr.addstr(line, start + len(text) + 1, value, vattr)
+                except Exception:
+                    pass
+
+            left_field(0, "Images", str(img_cnt), curses.A_BOLD)
+            right_field(0, "Size", size_str, curses.color_pair(19))
+
+            if unique_repos and unique_repos != img_cnt:
+                left_field(1, "Repos", str(unique_repos), curses.color_pair(19))
             if untagged:
-                try:
-                    self.stdscr.addstr(line, 0, "  Dangling:", curses.color_pair(4))
-                    self.stdscr.addstr(line, val_col, str(untagged), curses.color_pair(4) | curses.A_BOLD)
-                except Exception:
-                    pass
-                line += 1
-            if unique_repos != img_cnt and unique_repos > 0:
-                try:
-                    self.stdscr.addstr(line, 0, "  Repos:", curses.color_pair(1))
-                    self.stdscr.addstr(line, val_col, str(unique_repos), curses.color_pair(19))
-                except Exception:
-                    pass
-                line += 1
+                right_field(1, "Dangling", str(untagged),
+                            curses.color_pair(4) | curses.A_BOLD)
+
+            line = 2
+            if unused_str:
+                left_field(line, "Unused", unused_str, curses.color_pair(19))
+                right_field(line, "Largest", largest_str, curses.color_pair(19))
+            elif largest_str:
+                left_field(line, "Largest", largest_str, curses.color_pair(19))
+
+            line = 3 if unused_str else 2
+            if oldest_str:
+                left_field(line, "Oldest", oldest_str, curses.color_pair(19))
+
             if sel_cnt:
                 try:
-                    self.stdscr.addstr(line, 0, "  Selected:", curses.color_pair(1))
-                    self.stdscr.addstr(line, val_col, str(sel_cnt), curses.color_pair(4))
+                    self.stdscr.addstr(line + 1, 0, "  Selected:", curses.color_pair(1))
+                    self.stdscr.addstr(line + 1, val_col, str(sel_cnt), curses.color_pair(4))
                 except Exception:
                     pass
 

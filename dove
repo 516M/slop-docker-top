@@ -1316,6 +1316,37 @@ class DockerTop:
                     self.message_ts = time.time()
 
         elif key in (ord('d'), ord('D')):
+            if self.tab == 1:
+                sel_ids = list(self._sel_images)
+                if not sel_ids:
+                    self.message = "No images selected"
+                    self.message_ts = time.time()
+                    return
+                total_size = 0
+                displayed = []
+                for img in self._bg_images:
+                    iid = img.get('ID', '')[:19]
+                    if iid in sel_ids:
+                        repo = img.get('Repository', '?')
+                        tag = img.get('Tag', '?')
+                        size = self._parse_size(img.get('Size', '0B'))
+                        total_size += size
+                        label = f"{repo}:{tag}" if tag and tag != '<none>' else repo
+                        displayed.append(label[:30])
+                size_g = total_size / 1024**3
+                sz = f"-{size_g:.1f}G" if size_g >= 1.0 else f"-{total_size / 1024**2:.0f}M"
+                count = len(sel_ids)
+                if self.blocking_confirm(f"Delete {count} images {sz}?"):
+                    for img in self._bg_images:
+                        iid = img.get('ID', '')[:19]
+                        if iid in sel_ids:
+                            full_id = img.get('ID', '')[:12]
+                            run_cmd_simple(['docker', 'rmi', '-f', full_id])
+                    self._bg_images = get_images()
+                    self._sel_images.clear()
+                    self.message = f"Deleted {count} images {sz}"
+                    self.message_ts = time.time()
+                return
             sel = self.get_selected()
             if not sel:
                 return

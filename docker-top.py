@@ -997,10 +997,18 @@ class DockerTop:
             except Exception:
                 pass
         else:
-            fkey_groups = [
-                ("F1", "Help"), ("F3", "Search"), ("F4", "Filter"),
-                ("F5", "Cont"), ("F6", "Images"), ("F9", "Kill"), ("F10", "Quit"),
-            ]
+            if self.tab == 0:
+                fkey_groups = [
+                    ("F1", "Help"), ("F3", "Search"), ("F4", "Filter"),
+                    ("s", "Stop"), ("S", "Start"), ("R", "Rest"),
+                    ("d", "Del"), ("h", "Help"), ("q", "Quit"),
+                ]
+            else:
+                fkey_groups = [
+                    ("F1", "Help"), ("Space", "Sel"), ("a", "All"),
+                    ("u", "Clear"), ("r", "Ref"), ("f", "Filter"),
+                    ("h", "Help"), ("q", "Quit"),
+                ]
             x = 0
             for i, (key, desc) in enumerate(fkey_groups):
                 try:
@@ -1086,10 +1094,18 @@ class DockerTop:
             except Exception:
                 pass
         else:
-            fkey_groups = [
-                ("F1", "Help"), ("F3", "Search"), ("F4", "Filter"),
-                ("F5", "Cont"), ("F6", "Images"), ("F9", "Kill"), ("F10", "Quit"),
-            ]
+            if self.tab == 0:
+                fkey_groups = [
+                    ("F1", "Help"), ("F3", "Search"), ("F4", "Filter"),
+                    ("s", "Stop"), ("S", "Start"), ("R", "Rest"),
+                    ("d", "Del"), ("h", "Help"), ("q", "Quit"),
+                ]
+            else:
+                fkey_groups = [
+                    ("F1", "Help"), ("Space", "Sel"), ("a", "All"),
+                    ("u", "Clear"), ("r", "Ref"), ("f", "Filter"),
+                    ("h", "Help"), ("q", "Quit"),
+                ]
             x = 0
             for i, (key, desc) in enumerate(fkey_groups):
                 try:

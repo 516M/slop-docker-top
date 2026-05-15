@@ -606,7 +606,7 @@ class DockerTop:
         # fixed bar width shared by both meters
         prefix_len = 6   # "  Cpu " or "  Mem " (2 spaces + 4 chars)
         gap_status = 1    # space between ] and status text
-        bar_w = max(10, w - prefix_len - 2 - max_status - gap_status)  # -2 for [ and ]
+        bar_w = max(10, w - prefix_len - 2 - max_status - gap_status - 5)  # -2 for [ and ]
         status_x = 2 + len("Cpu ") + 1 + bar_w + 1 + gap_status  # common x for status
 
         def draw_status(y, text):

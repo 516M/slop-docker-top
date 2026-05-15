@@ -401,10 +401,8 @@ class DockerTop:
 
     def draw_cols(self, w, y, x, width):
         cols = (f" {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU%':<5} {'MEM%':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
-        if width < len(cols):
-            cols = cols[:width]
         try:
-            w.addstr(y, x, cols, curses.color_pair(16))
+            w.addstr(y, x, cols.ljust(width), curses.color_pair(16))
         except Exception:
             pass
 
@@ -860,12 +858,12 @@ class DockerTop:
                     attr = curses.color_pair(4) | curses.A_BOLD
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
-                    self.stdscr.addstr(yy, 0, str(data)[:w], attr)
+                    self.stdscr.addstr(yy, 0, str(data).ljust(w)[:w], attr)
                 elif lt == 'sheader':
                     attr = curses.A_DIM
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
-                    self.stdscr.addstr(yy, 0, str(data)[:w], attr)
+                    self.stdscr.addstr(yy, 0, str(data).ljust(w)[:w], attr)
                 elif lt == 'sep':
                     pass
                 elif lt == 'colhdr':
@@ -876,10 +874,8 @@ class DockerTop:
                                   selected=(abs_idx == self.selected_idx))
                 elif lt == 'icolhdr':
                     cols = " REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
-                    if len(cols) > w:
-                        cols = cols[:w]
                     try:
-                        self.stdscr.addstr(yy, 0, cols, curses.color_pair(16))
+                        self.stdscr.addstr(yy, 0, cols.ljust(w), curses.color_pair(16))
                     except Exception:
                         pass
                 elif lt == 'irow':

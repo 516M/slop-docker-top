@@ -200,7 +200,7 @@ class DockerTop:
         self._sel_images = set()
         threading.Thread(target=self._bg_images_refresh, daemon=True).start()
 
-        self.hdr_h = 5  # 2 meter bars + 1 status line + 1 blank + 1 tab bar
+        self.hdr_h = 6  # 1 top pad + 2 meter bars + 1 status line + 1 blank + 1 tab bar
         self.ftr_h = 1
 
     def content_height(self):
@@ -310,6 +310,7 @@ class DockerTop:
             if ft and not fcontainers and not proj_matches:
                 continue
 
+            lines.append(('blank', ''))
             if project:
                 header = f" Project: {project}"
                 lines.append(('pheader', header))
@@ -606,13 +607,13 @@ class DockerTop:
                 self.stdscr.addstr(y, 0, line[:w], curses.A_NORMAL)
 
         if self.tab == 0:
-            meter(0, "Cpu ", min(100, cpu), f"{cpu:.1f}%")
+            meter(1, "Cpu ", min(100, cpu), f"{cpu:.1f}%")
             mused_s = f"{mused / 1024**3:.1f}G" if mused > 1024**3 else f"{mused / 1024**2:.0f}M"
             mlim_s = f"{mlimit / 1024**3:.1f}G" if mlimit > 1024**3 else f"{mlimit / 1024**2:.0f}M"
-            meter(1, "Mem ", mem_pct, f"{mused_s}/{mlim_s}")
+            meter(2, "Mem ", mem_pct, f"{mused_s}/{mlim_s}")
         else:
-            meter(0, "Cpu ", 0, "─")
-            meter(1, "Mem ", 0, "─")
+            meter(1, "Cpu ", 0, "─")
+            meter(2, "Mem ", 0, "─")
 
         # status line — htop-style info line
         if self.tab == 0:
@@ -628,7 +629,7 @@ class DockerTop:
         if len(status) > w:
             status = status[:w]
         try:
-            self.stdscr.addstr(2, 0, status, curses.color_pair(19))
+            self.stdscr.addstr(3, 0, status, curses.color_pair(19))
         except Exception:
             pass
 
@@ -744,6 +745,8 @@ class DockerTop:
                         self.stdscr.addstr(yy, 2, fmt, attr)
                     except Exception:
                         pass
+                elif lt == 'blank':
+                    pass
                 elif lt == 'empty':
                     self.stdscr.addstr(yy, 0, str(data)[:w], curses.A_DIM)
             except Exception:

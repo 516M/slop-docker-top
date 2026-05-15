@@ -26,22 +26,36 @@ REFRESH_INTERVAL = 1
 _use_sudo = False
 
 def _detect_sudo():
-    """Check whether docker needs sudo and whether sudo is usable."""
+    """Check whether docker needs sudo. Runs in foreground so the
+    user can enter their sudo password once; subsequent background
+    sudo calls use the cached credential (no prompting)."""
     global _use_sudo
     try:
         r = subprocess.run(['docker', 'ps'], capture_output=True, text=True, timeout=5)
         if r.returncode == 0:
             _use_sudo = False
             return
-        if 'permission' in r.stderr.lower() or 'denied' in r.stderr.lower():
-            r2 = subprocess.run(['sudo', '-n', 'docker', 'ps'],
-                                capture_output=True, text=True, timeout=10)
-            if r2.returncode == 0:
-                _use_sudo = True
-                return
     except Exception:
         pass
-    _use_sudo = False
+
+    # docker ps failed — try to cache sudo credentials via sudo -v
+    # This prompts for a password if needed, then caches it so
+    # background threads can use sudo without interaction.
+    try:
+        r = subprocess.run(['sudo', '-v'], timeout=15)
+        if r.returncode != 0:
+            _use_sudo = False
+            return
+    except Exception:
+        _use_sudo = False
+        return
+
+    # Credentials cached — verify docker actually works with sudo
+    try:
+        r = subprocess.run(['sudo', 'docker', 'ps'], capture_output=True, text=True, timeout=5)
+        _use_sudo = (r.returncode == 0)
+    except Exception:
+        _use_sudo = False
 
 def _maybe_sudo(cmd):
     if _use_sudo and cmd and cmd[0] == 'docker':

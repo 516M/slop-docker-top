@@ -14,7 +14,7 @@ import re
 from collections import defaultdict, OrderedDict
 
 VERSION = "2.0.0"
-REFRESH_INTERVAL = 2
+REFRESH_INTERVAL = 1
 
 
 def run_cmd(cmd):
@@ -1150,7 +1150,7 @@ class DockerTop:
                 self.handle_key(key)
                 dirty = True
             else:
-                time.sleep(0.02)
+                time.sleep(0.01)
 
         if self._stats_proc:
             try:

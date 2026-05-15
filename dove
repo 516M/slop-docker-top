@@ -1334,9 +1334,16 @@ class DockerTop:
                         label = f"{repo}:{tag}" if tag and tag != '<none>' else repo
                         displayed.append(label[:30])
                 size_g = total_size / 1024**3
-                sz = f"-{size_g:.1f}G" if size_g >= 1.0 else f"-{total_size / 1024**2:.0f}M"
+                if size_g >= 1.0:
+                    sz = f"{size_g:.1f}G"
+                elif total_size >= 1024**2:
+                    sz = f"{total_size / 1024**2:.0f}M"
+                elif total_size >= 1024:
+                    sz = f"{total_size / 1024:.0f}K"
+                else:
+                    sz = f"{total_size}B"
                 count = len(sel_ids)
-                if self.blocking_confirm(f"Delete {count} images {sz}?"):
+                if self.blocking_confirm(f"Delete {count} images ({sz})?"):
                     for img in self._bg_images:
                         iid = img.get('ID', '')[:19]
                         if iid in sel_ids:

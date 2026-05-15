@@ -400,7 +400,7 @@ class DockerTop:
         return (cid_short, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending)
 
     def draw_cols(self, w, y, x, width):
-        cols = (f" {'ID':<12} {'NAME':<16} {'STATUS':<10} {'CPU':<6} {'MEM':<6} {'MEM USAGE':<16} {'NET I/O':<14} {'BLOCK I/O':<14} {'PIDS':>5}")
+        cols = (f" {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU':<5} {'MEM':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
         if width < len(cols):
             cols = cols[:width]
         try:
@@ -410,10 +410,10 @@ class DockerTop:
 
     def draw_row(self, w, y, x, width, row_data, selected=False):
         cid, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending = row_data
-        n = name[:16].ljust(16) if len(name) > 16 else name.ljust(16)
+        n = name[:22].ljust(22) if len(name) > 22 else name.ljust(22)
         c = cid[:12].ljust(12)
-        s = stat[:10].ljust(10)
-        fmt = f" {c} {n} {s} {cpu_bar:6} {mem_bar:6} {mem_u:16} {net:14} {blk:14} {pids:>5}"
+        s = stat[:12].ljust(12)
+        fmt = f" {c} {n} {s} {cpu_bar} {mem_bar} {mem_u:22} {net:18} {blk:18} {pids:>5}"
         if len(fmt) > width:
             fmt = fmt[:width]
 

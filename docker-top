@@ -428,18 +428,18 @@ class DockerTop:
         return (cid_short, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending)
 
     def draw_cols(self, w, y, x, width):
-        cols = (f" {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU%':<5} {'MEM%':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
+        cols = (f" {'#':>4} {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU%':<5} {'MEM%':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
         try:
             w.addstr(y, x, cols[:width].ljust(width), curses.color_pair(16))
         except Exception:
             pass
 
-    def draw_row(self, w, y, x, width, row_data, selected=False):
+    def draw_row(self, w, y, x, width, row_data, selected=False, lineno=0):
         cid, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending = row_data
         n = name[:22].ljust(22) if len(name) > 22 else name.ljust(22)
         c = cid[:12].ljust(12)
         s = stat[:12].ljust(12)
-        fmt = f" {c} {n} {s} {cpu_bar:>5} {mem_bar:>5} {mem_u:22} {net:18} {blk:18} {pids:>5}"
+        fmt = f" {lineno:>4} {c} {n} {s} {cpu_bar:>5} {mem_bar:>5} {mem_u:22} {net:18} {blk:18} {pids:>5}"
         if len(fmt) > width:
             fmt = fmt[:width]
 
@@ -870,6 +870,7 @@ class DockerTop:
             except Exception:
                 pass
 
+        lineno = 0
         for i, (lt, data) in enumerate(visible):
             yy = self.hdr_h + i
             if yy >= h - ft:
@@ -898,16 +899,19 @@ class DockerTop:
                 elif lt == 'colhdr':
                     self.draw_cols(self.stdscr, yy, 0, w)
                 elif lt == 'row':
+                    lineno += 1
                     row = self.render_row(data)
                     self.draw_row(self.stdscr, yy, 0, w, row,
-                                  selected=(abs_idx == self.selected_idx))
+                                  selected=(abs_idx == self.selected_idx),
+                                  lineno=lineno)
                 elif lt == 'icolhdr':
-                    cols = " REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
+                    cols = "    # REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
                     try:
                         self.stdscr.addstr(yy, 0, cols[:w].ljust(w), curses.color_pair(16))
                     except Exception:
                         pass
                 elif lt == 'irow':
+                    lineno += 1
                     repo, tag, iid, size, created, sel_state = data
                     flag = " \u2502"
                     if sel_state:
@@ -917,7 +921,7 @@ class DockerTop:
                     iid = iid[:19].ljust(19) if len(iid) > 19 else iid.ljust(19)
                     size_s = str(size)[:14].ljust(14) if len(str(size)) > 14 else str(size).ljust(14)
                     created_s = str(created)[:14].ljust(14) if len(str(created)) > 14 else str(created).ljust(14)
-                    fmt = f" {repo} {tag} {iid} {size_s} {created_s}"
+                    fmt = f" {lineno:>4} {repo} {tag} {iid} {size_s} {created_s}"
                     if len(fmt) > w - 2:
                         fmt = fmt[:w - 2]
                     if abs_idx == self.selected_idx:

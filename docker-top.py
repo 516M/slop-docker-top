@@ -392,7 +392,7 @@ class DockerTop:
         if width < len(cols):
             cols = cols[:width]
         try:
-            w.addstr(y, x, cols, curses.color_pair(5) | curses.A_BOLD)
+            w.addstr(y, x, cols, curses.A_BOLD)
         except Exception:
             pass
 
@@ -406,7 +406,7 @@ class DockerTop:
             fmt = fmt[:width]
 
         if selected:
-            attr = curses.color_pair(12)
+            attr = curses.A_REVERSE
         elif pending:
             attr = curses.color_pair(4) | curses.A_BOLD
         elif state in ('running',):
@@ -588,12 +588,12 @@ class DockerTop:
             try:
                 self.stdscr.addstr(y, 0, prefix, curses.color_pair(6))
                 if filled:
-                    self.stdscr.addstr(y, len(prefix), '#' * filled, bar_attr)
+                    self.stdscr.addstr(y, len(prefix), '|' * filled, bar_attr)
                 if bar_w - filled:
                     self.stdscr.addstr(y, len(prefix) + filled, ' ' * (bar_w - filled), curses.color_pair(6))
                 self.stdscr.addstr(y, len(prefix) + bar_w, text_part, curses.color_pair(6))
             except Exception:
-                line = f"{prefix}{'#' * filled}{' ' * (bar_w - filled)}{text_part}"
+                line = f"{prefix}{'|' * filled}{' ' * (bar_w - filled)}{text_part}"
                 self.stdscr.addstr(y, 0, line[:w], curses.color_pair(6))
 
         if self.tab == 0:
@@ -676,12 +676,12 @@ class DockerTop:
                 if lt == 'pheader':
                     attr = curses.color_pair(10)
                     if abs_idx == self.selected_idx:
-                        attr = curses.color_pair(12)
+                        attr = curses.A_REVERSE
                     self.stdscr.addstr(yy, 0, str(data)[:w], attr)
                 elif lt == 'sheader':
                     attr = curses.A_DIM
                     if abs_idx == self.selected_idx:
-                        attr = curses.color_pair(12)
+                        attr = curses.A_REVERSE
                     self.stdscr.addstr(yy, 0, str(data)[:w], attr)
                 elif lt == 'sep':
                     pass
@@ -696,7 +696,7 @@ class DockerTop:
                     if len(cols) > w:
                         cols = cols[:w]
                     try:
-                        self.stdscr.addstr(yy, 0, cols, curses.color_pair(5) | curses.A_BOLD)
+                        self.stdscr.addstr(yy, 0, cols, curses.A_BOLD)
                     except Exception:
                         pass
                 elif lt == 'irow':
@@ -713,7 +713,7 @@ class DockerTop:
                     if len(fmt) > w - 2:
                         fmt = fmt[:w - 2]
                     if abs_idx == self.selected_idx:
-                        attr = curses.color_pair(12)
+                        attr = curses.A_REVERSE
                     elif sel_state:
                         attr = curses.color_pair(4) | curses.A_BOLD
                     else:

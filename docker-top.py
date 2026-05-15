@@ -6,6 +6,7 @@ Supports filtering, scrolling, container actions, and keyboard navigation.
 """
 import curses
 import json
+import os
 import subprocess
 import threading
 import time
@@ -522,37 +523,28 @@ class DockerTop:
             curses.curs_set(1)
         except Exception:
             pass
-        curses.def_prog_mode()
+
+        # Build a shell-compatible command string
+        cmd_str = ' '.join(f"'{a}'" if ' ' in a else a for a in cmd_list)
         curses.endwin()
 
         try:
-            subprocess.run(cmd_list, check=False)
+            os.system(cmd_str)
         finally:
+            # restore terminal to a known state and reinitialize curses
+            stdscr_new = curses.initscr()
+            stdscr_new.keypad(1)
+            curses.cbreak()
+            curses.noecho()
+            stdscr_new.nodelay(1)
             try:
-                subprocess.run(['stty', 'sane'], capture_output=True)
+                curses.curs_set(0)
             except Exception:
                 pass
-            try:
-                try:
-                    curses.reset_prog_mode()
-                except Exception:
-                    self.stdscr = curses.initscr()
-                self.stdscr.keypad(1)
-                curses.cbreak()
-                curses.noecho()
-                self.stdscr.nodelay(1)
-                try:
-                    curses.curs_set(0)
-                except Exception:
-                    pass
-                self.height, self.width = self.stdscr.getmaxyx()
-            except Exception:
-                pass
-            try:
-                self.stdscr.clear()
-                self.stdscr.refresh()
-            except Exception:
-                pass
+            self.height, self.width = stdscr_new.getmaxyx()
+            self.stdscr = stdscr_new
+            stdscr_new.clear()
+            stdscr_new.refresh()
 
     def _parse_size(self, s):
         s = s.strip()

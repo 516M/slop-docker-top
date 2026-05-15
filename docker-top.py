@@ -420,11 +420,16 @@ class DockerTop:
         if selected:
             attr = curses.A_REVERSE
         elif pending:
-            attr = curses.color_pair(4) | curses.A_BOLD
+            if stat.startswith('Stopping'):
+                attr = curses.color_pair(3) | curses.A_BOLD  # red
+            elif stat.startswith('Starting'):
+                attr = curses.color_pair(4) | curses.A_BOLD  # yellow
+            else:
+                attr = curses.color_pair(4) | curses.A_BOLD  # yellow default
         elif state in ('running',):
             attr = curses.A_BOLD | curses.color_pair(2)
         elif state in ('exited', 'dead'):
-            attr = curses.A_NORMAL
+            attr = curses.A_DIM
         elif state in ('paused',):
             attr = curses.color_pair(4)
         else:

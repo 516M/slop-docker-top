@@ -886,7 +886,11 @@ class DockerTop:
                         attr = curses.A_DIM | curses.color_pair(4)
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
-                    self.stdscr.addstr(yy, 0, ("    " + str(text)).ljust(w)[:w], attr)
+                    if self._collapsed:
+                        lineno += 1
+                        self.stdscr.addstr(yy, 0, (f"{lineno:<4} {text}").ljust(w)[:w], attr)
+                    else:
+                        self.stdscr.addstr(yy, 0, ("    " + str(text)).ljust(w)[:w], attr)
                 elif lt == 'sheader':
                     text, has_running = data
                     if has_running:
@@ -895,7 +899,11 @@ class DockerTop:
                         attr = curses.color_pair(4) | curses.A_DIM
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
-                    self.stdscr.addstr(yy, 0, ("    " + str(text)).ljust(w)[:w], attr)
+                    if self._collapsed:
+                        lineno += 1
+                        self.stdscr.addstr(yy, 0, (f"{lineno:<4} {text}").ljust(w)[:w], attr)
+                    else:
+                        self.stdscr.addstr(yy, 0, ("    " + str(text)).ljust(w)[:w], attr)
                 elif lt == 'colhdr':
                     self.draw_cols(self.stdscr, yy, 0, w)
                 elif lt == 'row':

@@ -168,6 +168,8 @@ class DockerTop:
             curses.init_pair(19, 8, -1)   # bright black foreground
         else:
             curses.init_pair(19, curses.COLOR_WHITE, -1)  # fallback
+        # column header labels: white on green
+        curses.init_pair(20, curses.COLOR_WHITE, curses.COLOR_GREEN)
 
         try:
             curses.curs_set(0)
@@ -402,7 +404,7 @@ class DockerTop:
         if width < len(cols):
             cols = cols[:width]
         try:
-            w.addstr(y, x, cols, curses.color_pair(16))
+            w.addstr(y, x, cols, curses.color_pair(20))
         except Exception:
             pass
 
@@ -699,7 +701,7 @@ class DockerTop:
 
             try:
                 if lt == 'pheader':
-                    attr = curses.color_pair(10)
+                    attr = curses.color_pair(4) | curses.A_BOLD
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
                     self.stdscr.addstr(yy, 0, str(data)[:w], attr)
@@ -721,7 +723,7 @@ class DockerTop:
                     if len(cols) > w:
                         cols = cols[:w]
                     try:
-                        self.stdscr.addstr(yy, 0, cols, curses.color_pair(16))
+                        self.stdscr.addstr(yy, 0, cols, curses.color_pair(20))
                     except Exception:
                         pass
                 elif lt == 'irow':

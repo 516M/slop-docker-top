@@ -395,12 +395,12 @@ class DockerTop:
                     pending = True
                     stat = p['label']
                     break
-        cpu_bar = _pct_bar(cpu)
-        mem_bar = _pct_bar(mem_p)
+        cpu_bar = cpu
+        mem_bar = mem_p
         return (cid_short, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending)
 
     def draw_cols(self, w, y, x, width):
-        cols = (f" {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU':<5} {'MEM':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
+        cols = (f" {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU%':<5} {'MEM%':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
         if width < len(cols):
             cols = cols[:width]
         try:
@@ -413,7 +413,7 @@ class DockerTop:
         n = name[:22].ljust(22) if len(name) > 22 else name.ljust(22)
         c = cid[:12].ljust(12)
         s = stat[:12].ljust(12)
-        fmt = f" {c} {n} {s} {cpu_bar} {mem_bar} {mem_u:22} {net:18} {blk:18} {pids:>5}"
+        fmt = f" {c} {n} {s} {cpu_bar:>5} {mem_bar:>5} {mem_u:22} {net:18} {blk:18} {pids:>5}"
         if len(fmt) > width:
             fmt = fmt[:width]
 

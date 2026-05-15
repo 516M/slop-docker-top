@@ -200,7 +200,7 @@ class DockerTop:
         self._sel_images = set()
         threading.Thread(target=self._bg_images_refresh, daemon=True).start()
 
-        self.hdr_h = 4  # 2 meter bars + 1 status line + 1 tab bar
+        self.hdr_h = 5  # 2 meter bars + 1 status line + 1 blank + 1 tab bar
         self.ftr_h = 1
 
     def content_height(self):

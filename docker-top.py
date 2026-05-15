@@ -410,9 +410,9 @@ class DockerTop:
         elif pending:
             attr = curses.color_pair(4) | curses.A_BOLD
         elif state in ('running',):
-            attr = curses.color_pair(2)
+            attr = curses.A_BOLD | curses.color_pair(2)
         elif state in ('exited', 'dead'):
-            attr = curses.color_pair(3)
+            attr = curses.A_DIM
         elif state in ('paused',):
             attr = curses.color_pair(4)
         else:
@@ -579,16 +579,10 @@ class DockerTop:
             text_part = f"] {text}"
             bar_w = max(3, w - len(prefix) - len(text_part) - 1)
             filled = round(pct / 100 * bar_w)
-            if pct < 50:
-                bar_attr = curses.color_pair(13)
-            elif pct < 80:
-                bar_attr = curses.color_pair(14)
-            else:
-                bar_attr = curses.color_pair(15)
             try:
                 self.stdscr.addstr(y, 0, prefix, curses.color_pair(6))
                 if filled:
-                    self.stdscr.addstr(y, len(prefix), '|' * filled, bar_attr)
+                    self.stdscr.addstr(y, len(prefix), '|' * filled, curses.color_pair(2) | curses.A_BOLD)
                 if bar_w - filled:
                     self.stdscr.addstr(y, len(prefix) + filled, ' ' * (bar_w - filled), curses.color_pair(6))
                 self.stdscr.addstr(y, len(prefix) + bar_w, text_part, curses.color_pair(6))

@@ -522,23 +522,37 @@ class DockerTop:
             curses.curs_set(1)
         except Exception:
             pass
+        curses.def_prog_mode()
         curses.endwin()
 
         try:
             subprocess.run(cmd_list, check=False)
         finally:
-            # fully re-initialize curses from scratch
-            self.stdscr = curses.initscr()
-            self.stdscr.keypad(1)
-            curses.cbreak()
-            curses.noecho()
-            self.stdscr.nodelay(1)
             try:
-                curses.curs_set(0)
+                subprocess.run(['stty', 'sane'], capture_output=True)
             except Exception:
                 pass
-            self.height, self.width = self.stdscr.getmaxyx()
-            self.stdscr.refresh()
+            try:
+                try:
+                    curses.reset_prog_mode()
+                except Exception:
+                    self.stdscr = curses.initscr()
+                self.stdscr.keypad(1)
+                curses.cbreak()
+                curses.noecho()
+                self.stdscr.nodelay(1)
+                try:
+                    curses.curs_set(0)
+                except Exception:
+                    pass
+                self.height, self.width = self.stdscr.getmaxyx()
+            except Exception:
+                pass
+            try:
+                self.stdscr.clear()
+                self.stdscr.refresh()
+            except Exception:
+                pass
 
     def _parse_size(self, s):
         s = s.strip()

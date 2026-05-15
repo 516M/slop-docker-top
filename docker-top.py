@@ -402,7 +402,7 @@ class DockerTop:
     def draw_cols(self, w, y, x, width):
         cols = (f" {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU%':<5} {'MEM%':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
         try:
-            w.addstr(y, x, cols.ljust(width), curses.color_pair(16))
+            w.addstr(y, x, cols[:width].ljust(width), curses.color_pair(16))
         except Exception:
             pass
 
@@ -875,7 +875,7 @@ class DockerTop:
                 elif lt == 'icolhdr':
                     cols = " REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
                     try:
-                        self.stdscr.addstr(yy, 0, cols.ljust(w), curses.color_pair(16))
+                        self.stdscr.addstr(yy, 0, cols[:w].ljust(w), curses.color_pair(16))
                     except Exception:
                         pass
                 elif lt == 'irow':
@@ -999,15 +999,15 @@ class DockerTop:
         else:
             if self.tab == 0:
                 fkey_groups = [
-                    ("F1", "Help"), ("F3", "Search"), ("F4", "Filter"),
-                    ("s", "Stop"), ("S", "Start"), ("R", "Rest"),
-                    ("d", "Del"), ("h", "Help"), ("q", "Quit"),
+                    ("h", "Help"), ("f", "Filter"), ("s", "Stop"),
+                    ("S", "Start"), ("R", "Rest"), ("d", "Del"),
+                    ("q", "Quit"),
                 ]
             else:
                 fkey_groups = [
-                    ("F1", "Help"), ("Space", "Sel"), ("a", "All"),
+                    ("h", "Help"), ("Space", "Sel"), ("a", "All"),
                     ("u", "Clear"), ("r", "Ref"), ("f", "Filter"),
-                    ("h", "Help"), ("q", "Quit"),
+                    ("q", "Quit"),
                 ]
             x = 0
             for i, (key, desc) in enumerate(fkey_groups):
@@ -1096,15 +1096,15 @@ class DockerTop:
         else:
             if self.tab == 0:
                 fkey_groups = [
-                    ("F1", "Help"), ("F3", "Search"), ("F4", "Filter"),
-                    ("s", "Stop"), ("S", "Start"), ("R", "Rest"),
-                    ("d", "Del"), ("h", "Help"), ("q", "Quit"),
+                    ("h", "Help"), ("f", "Filter"), ("s", "Stop"),
+                    ("S", "Start"), ("R", "Rest"), ("d", "Del"),
+                    ("q", "Quit"),
                 ]
             else:
                 fkey_groups = [
-                    ("F1", "Help"), ("Space", "Sel"), ("a", "All"),
+                    ("h", "Help"), ("Space", "Sel"), ("a", "All"),
                     ("u", "Clear"), ("r", "Ref"), ("f", "Filter"),
-                    ("h", "Help"), ("q", "Quit"),
+                    ("q", "Quit"),
                 ]
             x = 0
             for i, (key, desc) in enumerate(fkey_groups):

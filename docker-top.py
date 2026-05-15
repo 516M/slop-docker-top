@@ -589,52 +589,56 @@ class DockerTop:
         running, total, paused, cpu, mused, mlimit, pcount, rprojects = self._compute_metrics()
         mem_pct = min(100, mused / mlimit * 100) if mlimit > 0 else 0
 
-        def meter(y, label, pct, text):
+        # build status strings
+        if self.tab == 0:
+            s_cont = (f"Containers: {total} total, {running} running"
+                      f"{f', {paused} paused' if paused else ''}")
+            s_proj = f"Projects: {pcount}, {rprojects} running"
+            s_flt = f"Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}"
+        else:
+            sel = len(self._sel_images)
+            s_cont = f"Images: {len(self._bg_images)} total"
+            s_proj = f"{sel} selected" if sel else ""
+            s_flt = s_cont
+            s_cont = ""
+        status_lines = [s_cont, s_proj, s_flt]
+        max_status = max(len(l) for l in status_lines) + 2
+
+        def meter(y, label, pct, text, status=""):
             prefix = f"  {label}["
             text_part = f"] {text}"
-            bar_w = max(3, w - len(prefix) - len(text_part) - 1)
+            bar_w = max(3, w - len(prefix) - len(text_part) - 1 - max_status)
             filled = round(pct / 100 * bar_w)
             try:
-                # label in cyan
                 self.stdscr.addstr(y, 0, f"  ", curses.A_NORMAL)
                 self.stdscr.addstr(y, 2, label, curses.color_pair(1))
                 self.stdscr.addstr(y, 2 + len(label), "[", curses.A_BOLD)
                 if filled:
-                    # green | for the filled portion
                     self.stdscr.addstr(y, 2 + len(label) + 1, '|' * filled, curses.color_pair(2))
                 if bar_w - filled:
                     self.stdscr.addstr(y, 2 + len(label) + 1 + filled, ' ' * (bar_w - filled), curses.A_NORMAL)
-                # ] and text in gray
                 self.stdscr.addstr(y, 2 + len(label) + 1 + bar_w, "]", curses.A_NORMAL)
                 self.stdscr.addstr(y, 2 + len(label) + 2 + bar_w, text, curses.color_pair(19))
+                if status:
+                    sx = 2 + len(label) + 2 + bar_w + len(text) + 1
+                    self.stdscr.addstr(y, sx, status, curses.color_pair(19))
             except Exception:
-                line = f"  {label}[{'|' * filled}{' ' * (bar_w - filled)}] {text}"
+                line = f"  {label}[{'|' * filled}{' ' * (bar_w - filled)}] {text}  {status}"
                 self.stdscr.addstr(y, 0, line[:w], curses.A_NORMAL)
 
         if self.tab == 0:
-            meter(1, "Cpu ", min(100, cpu), f"{cpu:.1f}%")
+            meter(1, "Cpu ", min(100, cpu), f"{cpu:.1f}%", status_lines[0])
             mused_s = f"{mused / 1024**3:.1f}G" if mused > 1024**3 else f"{mused / 1024**2:.0f}M"
             mlim_s = f"{mlimit / 1024**3:.1f}G" if mlimit > 1024**3 else f"{mlimit / 1024**2:.0f}M"
-            meter(2, "Mem ", mem_pct, f"{mused_s}/{mlim_s}")
+            meter(2, "Mem ", mem_pct, f"{mused_s}/{mlim_s}", status_lines[1])
         else:
             meter(1, "Cpu ", 0, "─")
             meter(2, "Mem ", 0, "─")
 
-        # status line — htop-style info line
-        if self.tab == 0:
-            status = (f"Containers: {total} total, {running} running"
-                      f"{f', {paused} paused' if paused else ''}"
-                      f"  |  Projects: {pcount}, {rprojects} running"
-                      f"  |  Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
-        else:
-            sel = len(self._sel_images)
-            status = (f"Images: {len(self._bg_images)} total"
-                      f"{f', {sel} selected' if sel else ''}"
-                      f"  |  Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
-        if len(status) > w:
-            status = status[:w]
+        # third status line (Filter) on line 3, right-aligned
         try:
-            self.stdscr.addstr(3, 0, status, curses.color_pair(19))
+            if status_lines[2]:
+                self.stdscr.addstr(3, w - len(status_lines[2]) - 1, f" {status_lines[2]}", curses.color_pair(19))
         except Exception:
             pass
 

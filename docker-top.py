@@ -156,13 +156,12 @@ class DockerTop:
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
         curses.init_pair(9, curses.COLOR_MAGENTA, -1)
         curses.init_pair(10, curses.COLOR_WHITE, curses.COLOR_BLACK)
-        # modern extras (gracefully degrade if 256-color unsupported)
-        if curses.COLORS >= 256:
-            curses.init_pair(11, -1, 236)   # zebra stripe (dark gray)
-            curses.init_pair(12, -1, 24)    # selection (dark cyan-blue)
-        else:
-            curses.init_pair(11, -1, -1)    # no zebra on basic terminals
-            curses.init_pair(12, 7, 4)      # selection: white on blue
+        # htop meter bar fills (foreground on header blue background)
+        curses.init_pair(13, curses.COLOR_GREEN, curses.COLOR_BLUE)
+        curses.init_pair(14, curses.COLOR_YELLOW, curses.COLOR_BLUE)
+        curses.init_pair(15, curses.COLOR_RED, curses.COLOR_BLUE)
+        # htop selection: white on blue
+        curses.init_pair(12, curses.COLOR_WHITE, curses.COLOR_BLUE)
 
         try:
             curses.curs_set(0)
@@ -580,14 +579,22 @@ class DockerTop:
             text_part = f"] {text}"
             bar_w = max(3, w - len(prefix) - len(text_part) - 1)
             filled = round(pct / 100 * bar_w)
-            bar = '#' * filled + ' ' * (bar_w - filled)
-            line = f"{prefix}{bar}{text_part}"
-            if len(line) > w:
-                line = line[:w]
+            if pct < 50:
+                bar_attr = curses.color_pair(13)
+            elif pct < 80:
+                bar_attr = curses.color_pair(14)
+            else:
+                bar_attr = curses.color_pair(15)
             try:
-                self.stdscr.addstr(y, 0, line, curses.color_pair(6))
+                self.stdscr.addstr(y, 0, prefix, curses.color_pair(6))
+                if filled:
+                    self.stdscr.addstr(y, len(prefix), '#' * filled, bar_attr)
+                if bar_w - filled:
+                    self.stdscr.addstr(y, len(prefix) + filled, ' ' * (bar_w - filled), curses.color_pair(6))
+                self.stdscr.addstr(y, len(prefix) + bar_w, text_part, curses.color_pair(6))
             except Exception:
-                pass
+                line = f"{prefix}{'#' * filled}{' ' * (bar_w - filled)}{text_part}"
+                self.stdscr.addstr(y, 0, line[:w], curses.color_pair(6))
 
         if self.tab == 0:
             rpct = min(100, running / max(1, total) * 100) if total else 0

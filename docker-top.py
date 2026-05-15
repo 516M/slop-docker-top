@@ -675,6 +675,12 @@ class DockerTop:
             total_bytes = sum(self._parse_size(img.get('Size', '0B'))
                               for img in self._bg_images)
             sel_cnt = len(self._sel_images)
+            unique_repos = len(set(img.get('Repository', '<none>')
+                                   for img in self._bg_images
+                                   if img.get('Repository', '<none>') != '<none>'))
+            untagged = sum(1 for img in self._bg_images
+                           if img.get('Repository', '<none>') == '<none>'
+                           and img.get('Tag', '<none>') == '<none>')
             size_g = total_bytes / 1024**3
             if size_g >= 1.0:
                 size_str = f"{size_g:.1f}G"
@@ -684,21 +690,34 @@ class DockerTop:
                 size_str = f"{total_bytes / 1024:.0f}K"
             val_col = 14  # aligned column for values
             try:
-                # line 0: Images count
                 self.stdscr.addstr(0, 0, "  Images:", curses.color_pair(1))
                 self.stdscr.addstr(0, val_col, str(img_cnt), curses.A_BOLD)
             except Exception:
                 pass
             try:
-                # line 1: total size
                 self.stdscr.addstr(1, 0, "  Size:", curses.color_pair(1))
                 self.stdscr.addstr(1, val_col, size_str, curses.color_pair(19))
             except Exception:
                 pass
+            line = 2
+            if untagged:
+                try:
+                    self.stdscr.addstr(line, 0, "  Dangling:", curses.color_pair(4))
+                    self.stdscr.addstr(line, val_col, str(untagged), curses.color_pair(4) | curses.A_BOLD)
+                except Exception:
+                    pass
+                line += 1
+            if unique_repos != img_cnt and unique_repos > 0:
+                try:
+                    self.stdscr.addstr(line, 0, "  Repos:", curses.color_pair(1))
+                    self.stdscr.addstr(line, val_col, str(unique_repos), curses.color_pair(19))
+                except Exception:
+                    pass
+                line += 1
             if sel_cnt:
                 try:
-                    self.stdscr.addstr(2, 0, "  Selected:", curses.color_pair(1))
-                    self.stdscr.addstr(2, val_col, str(sel_cnt), curses.color_pair(4))
+                    self.stdscr.addstr(line, 0, "  Selected:", curses.color_pair(1))
+                    self.stdscr.addstr(line, val_col, str(sel_cnt), curses.color_pair(4))
                 except Exception:
                     pass
 

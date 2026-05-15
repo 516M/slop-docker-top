@@ -1396,7 +1396,9 @@ class DockerTop:
                         self._sel_images.discard(iid)
                     else:
                         self._sel_images.add(iid)
+                self.selected_idx = self.find_next_row()
             else:
+                self.selected_idx = self.find_next_row()
                 ch = self.content_height()
                 for _ in range(ch):
                     new = self.find_next_row()

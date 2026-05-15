@@ -206,7 +206,7 @@ class DockerTop:
         self._sel_images = set()
         threading.Thread(target=self._bg_images_refresh, daemon=True).start()
 
-        self.hdr_h = 6
+        self.hdr_h = 7  # 1 top pad + 2 meters + 1 status + 1 blank + 1 tab bar + 1 col header
         self.ftr_h = 1
 
     def content_height(self):
@@ -327,8 +327,9 @@ class DockerTop:
         ft = self.filter_text.lower().strip() if self.filter_text else ''
 
         if self.groups:
-            lines.append(('colhdr', ''))
+            pass  # colhdr now drawn at fixed position in draw()
 
+        first_visible = True
         for project, containers in self.groups.items():
             fcontainers = containers
             proj_matches = False
@@ -341,7 +342,9 @@ class DockerTop:
             if ft and not fcontainers and not proj_matches:
                 continue
 
-            lines.append(('blank', ''))
+            if not first_visible:
+                lines.append(('blank', ''))
+            first_visible = False
             if project:
                 header = f" Project: {project}"
                 running_in_proj = any(c.get('State') == 'running' for c in fcontainers)
@@ -373,7 +376,6 @@ class DockerTop:
     def _build_images_lines(self):
         lines = []
         ft = self.filter_text.lower().strip() if self.filter_text else ''
-        lines.append(('icolhdr', ''))
         for img in self._bg_images:
             repo = img.get('Repository', '<none>') or '<none>'
             tag = img.get('Tag', '<none>') or '<none>'
@@ -858,13 +860,25 @@ class DockerTop:
             for i, label in enumerate(tab_labels):
                 entry = f" {label} "
                 if i == self.tab:
-                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.color_pair(16))
+                    self.stdscr.addstr(self.hdr_h - 2, x, entry, curses.color_pair(16))
                 else:
-                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.color_pair(17))
+                    self.stdscr.addstr(self.hdr_h - 2, x, entry, curses.color_pair(17))
                 x += len(entry)
         except Exception:
             tab_line = "  ".join(f"[{l}]" if i == self.tab else f" {l} " for i, l in enumerate(tab_labels))
-            self.stdscr.addstr(self.hdr_h - 1, 0, tab_line[:w], curses.A_NORMAL)
+            self.stdscr.addstr(self.hdr_h - 2, 0, tab_line[:w], curses.A_NORMAL)
+
+        # fixed column header row
+        try:
+            self.stdscr.move(self.hdr_h - 1, 0)
+            self.stdscr.clrtoeol()
+            if self.tab == 0:
+                self.draw_cols(self.stdscr, self.hdr_h - 1, 0, w)
+            else:
+                cols = "#   REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
+                self.stdscr.addstr(self.hdr_h - 1, 0, cols[:w].ljust(w), curses.color_pair(16))
+        except Exception:
+            pass
 
         self.display_lines = self.build_display_lines()
         self.total_lines = len(self.display_lines)

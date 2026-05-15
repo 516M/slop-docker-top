@@ -608,9 +608,10 @@ class DockerTop:
 
         # fixed bar width shared by both meters
         prefix_len = 6   # "  Cpu " or "  Mem " (2 spaces + 4 chars)
-        gap_status = 1    # space between ] and status text
-        bar_w = max(10, w - prefix_len - 2 - max_status - gap_status - 5)  # -2 for [ and ]
-        status_x = 2 + len("Cpu ") + 1 + bar_w + 1 + gap_status  # common x for status
+        gap_status = 2    # spaces between percentage and status text
+        pct_extra = 5    # room for " 0.0%" (space + 4 chars minimum)
+        bar_w = max(10, w - prefix_len - 2 - pct_extra - gap_status - max_status)  # -2 for [ and ]
+        status_x = 2 + len("Cpu ") + 1 + bar_w + 1  # right after the ]
 
         def draw_status(y, text):
             """Draw status text: running numbers in bold green, (none) in gray."""
@@ -635,29 +636,44 @@ class DockerTop:
 
         def meter(y, label, pct, text, status=""):
             pct_str = text
-            pct_len = len(pct_str)
-            bar_idx = 2 + len(label) + 1  # position where bar content starts
+            bar_idx = 2 + len(label) + 1
             filled = round(pct / 100 * bar_w)
-            pct_pos = bar_w - pct_len    # right-align percentage inside bar
-            fill_end = min(filled, pct_pos)  # don't let fill overlap percentage
+            empty = bar_w - filled
             try:
                 self.stdscr.addstr(y, 0, f"  ", curses.A_NORMAL)
                 self.stdscr.addstr(y, 2, label, curses.color_pair(1))
                 self.stdscr.addstr(y, 2 + len(label), "[", curses.A_BOLD)
-                if fill_end > 0:
-                    self.stdscr.addstr(y, bar_idx, '|' * fill_end, curses.color_pair(2))
-                if fill_end < pct_pos:
-                    self.stdscr.addstr(y, bar_idx + fill_end, ' ' * (pct_pos - fill_end), curses.A_NORMAL)
-                self.stdscr.addstr(y, bar_idx + pct_pos, pct_str, curses.color_pair(19))
-                after_pct = pct_pos + pct_len
-                if after_pct < bar_w:
-                    self.stdscr.addstr(y, bar_idx + after_pct, ' ' * (bar_w - after_pct), curses.A_NORMAL)
+                if filled:
+                    self.stdscr.addstr(y, bar_idx, '|' * filled, curses.color_pair(2))
+                if empty:
+                    self.stdscr.addstr(y, bar_idx + filled, ' ' * empty, curses.A_NORMAL)
                 self.stdscr.addstr(y, bar_idx + bar_w, "]", curses.A_NORMAL)
+                # percentage after the bar
+                cx = bar_idx + bar_w + 1
+                self.stdscr.addstr(y, cx, f" {pct_str}", curses.color_pair(19))
+                cx += 1 + len(pct_str) + gap_status
                 if status:
-                    draw_status(y, status)
+                    draw_status_at(y, cx, status)
             except Exception:
-                bar = f"{'|' * fill_end}{' ' * (pct_pos - fill_end)}{pct_str}{' ' * (bar_w - after_pct)}"
-                self.stdscr.addstr(y, 0, f"  {label}[{bar}]   {status}"[:w], curses.A_NORMAL)
+                line = f"  {label}[{'|' * filled}{' ' * empty}] {pct_str}  {status}"
+                self.stdscr.addstr(y, 0, line[:w], curses.A_NORMAL)
+
+        def draw_status_at(y, x, text):
+            if not text:
+                return
+            cx = x
+            for m in re.finditer(r'(\d+)(?= running)|(\(\w+\))', text):
+                if m.start() > cx - x:
+                    self.stdscr.addstr(y, cx, text[cx - x:m.start()], curses.color_pair(1))
+                    cx += m.start() - (cx - x)
+                if m.group(1):
+                    self.stdscr.addstr(y, cx, m.group(1), curses.A_BOLD | curses.color_pair(2))
+                    cx += len(m.group(1))
+                elif m.group(2):
+                    self.stdscr.addstr(y, cx, m.group(2), curses.color_pair(19))
+                    cx += len(m.group(2))
+            if cx - x < len(text):
+                self.stdscr.addstr(y, cx, text[cx - x:], curses.color_pair(1))
 
         if self.tab == 0:
             meter(1, "Cpu ", min(100, cpu), f"{cpu:.1f}%", status_lines[0])
@@ -787,12 +803,120 @@ class DockerTop:
             except Exception:
                 pass
 
-        # footer — htop-style F-key bar (overridden by pending/filter/command/message)
-        try:
-            self.stdscr.move(h - ft, 0)
-            self.stdscr.clrtoeol()
-        except Exception:
-            pass
+        # footer
+        sel_name = ""
+        sel_state = ""
+        sel = self.get_selected()
+        if sel:
+            kind, data = sel
+            if kind == 'container':
+                sel_name = data.get('Names', '')
+                sel_state = data.get('State', '')
+            elif kind == 'project':
+                sel_name = f"[Project] {data}"
+                sel_state = ''
+            elif kind == 'image':
+                sel_name = f"[Image] {data[0]}:{data[1]}"
+                sel_state = ''
+
+        show_interactive = (sel and kind == 'container' and sel_state == 'running')
+
+        with self._pending_lock:
+            has_pending = bool(self._pending)
+
+        if has_pending:
+            try:
+                self.stdscr.move(h - ft, 0)
+                self.stdscr.clrtoeol()
+            except Exception:
+                pass
+            spinner = '|/-\\'[int(time.time() * 6) % 4]
+            with self._pending_lock:
+                first = self._pending[0]['label']
+                extra = f" (+{len(self._pending)-1})" if len(self._pending) > 1 else ""
+            msg = f" {spinner} {first}{extra}..."
+            if len(msg) > w:
+                msg = msg[:w]
+            try:
+                self.stdscr.addstr(h - ft, 0, msg, curses.color_pair(4) | curses.A_BOLD)
+            except Exception:
+                pass
+        elif self.is_filtering:
+            try:
+                self.stdscr.move(h - ft, 0)
+                self.stdscr.clrtoeol()
+            except Exception:
+                pass
+            prompt = f" filter: {self.filter_text}\u2588"
+            if len(prompt) > w:
+                prompt = prompt[:w]
+            try:
+                self.stdscr.addstr(h - ft, 0, prompt, curses.color_pair(8))
+            except Exception:
+                pass
+        elif self.command_mode:
+            try:
+                self.stdscr.move(h - ft, 0)
+                self.stdscr.clrtoeol()
+            except Exception:
+                pass
+            try:
+                self.stdscr.addstr(h - ft, 0, ":", curses.color_pair(9))
+            except Exception:
+                pass
+        elif self.message and time.time() - self.message_ts < 4:
+            try:
+                self.stdscr.move(h - ft, 0)
+                self.stdscr.clrtoeol()
+            except Exception:
+                pass
+            msg = f" {self.message}"
+            if len(msg) > w:
+                msg = msg[:w]
+            try:
+                self.stdscr.addstr(h - ft, 0, msg, curses.color_pair(4))
+            except Exception:
+                pass
+        elif self.filter_text:
+            try:
+                self.stdscr.move(h - ft, 0)
+                self.stdscr.clrtoeol()
+            except Exception:
+                pass
+            prompt = f" filter: {self.filter_text}"
+            if len(prompt) > w:
+                prompt = prompt[:w]
+            try:
+                self.stdscr.addstr(h - ft, 0, prompt, curses.color_pair(8))
+            except Exception:
+                pass
+        else:
+            fkey_groups = [
+                ("F1", "Help"), ("F3", "Search"), ("F4", "Filter"),
+                ("F5", "Cont"), ("F6", "Images"), ("F9", "Kill"), ("F10", "Quit"),
+            ]
+            x = 0
+            for i, (key, desc) in enumerate(fkey_groups):
+                try:
+                    self.stdscr.addstr(h - ft, x, key, curses.color_pair(10) | curses.A_BOLD)
+                except Exception:
+                    pass
+                x += len(key)
+                try:
+                    if i == len(fkey_groups) - 1:
+                        # fill all remaining width with cyan background
+                        self.stdscr.addstr(h - ft, x, desc + ' ' * (w - x - len(desc)),
+                                           curses.color_pair(18))
+                    else:
+                        self.stdscr.addstr(h - ft, x, desc, curses.color_pair(18))
+                        x += len(desc)
+                except Exception:
+                    pass
+            # ensure the very last column has cyan background
+            try:
+                self.stdscr.addstr(h - ft, w - 1, ' ', curses.color_pair(18))
+            except Exception:
+                pass
 
         sel_name = ""
         sel_state = ""
@@ -869,8 +993,8 @@ class DockerTop:
                 x += len(key)
                 try:
                     if i == len(fkey_groups) - 1:
-                        remaining = w - x
-                        self.stdscr.addstr(h - ft, x, desc.ljust(remaining), curses.color_pair(18))
+                        self.stdscr.addstr(h - ft, x, desc + ' ' * (w - x - len(desc)),
+                                           curses.color_pair(18))
                     else:
                         self.stdscr.addstr(h - ft, x, desc, curses.color_pair(18))
                         x += len(desc)

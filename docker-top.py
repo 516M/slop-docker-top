@@ -404,7 +404,7 @@ class DockerTop:
         if width < len(cols):
             cols = cols[:width]
         try:
-            w.addstr(y, x, cols, curses.color_pair(20))
+            w.addstr(y, x, cols, curses.color_pair(16))
         except Exception:
             pass
 
@@ -424,7 +424,7 @@ class DockerTop:
         elif state in ('running',):
             attr = curses.A_BOLD | curses.color_pair(2)
         elif state in ('exited', 'dead'):
-            attr = curses.A_DIM
+            attr = curses.A_NORMAL
         elif state in ('paused',):
             attr = curses.color_pair(4)
         else:
@@ -723,7 +723,7 @@ class DockerTop:
                     if len(cols) > w:
                         cols = cols[:w]
                     try:
-                        self.stdscr.addstr(yy, 0, cols, curses.color_pair(20))
+                        self.stdscr.addstr(yy, 0, cols, curses.color_pair(16))
                     except Exception:
                         pass
                 elif lt == 'irow':

@@ -999,7 +999,8 @@ class DockerTop:
         else:
             if self.tab == 0:
                 fkey_groups = [
-                    ("h", "Help"), ("f", "Filter"), ("s", "Stop"),
+                    ("h", "Help"), ("f", "Filter"), ("e", "Sh"),
+                    ("l", "Logs"), ("i", "Insp"), ("s", "Stop"),
                     ("S", "Start"), ("R", "Rest"), ("d", "Del"),
                     ("q", "Quit"),
                 ]
@@ -1096,7 +1097,8 @@ class DockerTop:
         else:
             if self.tab == 0:
                 fkey_groups = [
-                    ("h", "Help"), ("f", "Filter"), ("s", "Stop"),
+                    ("h", "Help"), ("f", "Filter"), ("e", "Sh"),
+                    ("l", "Logs"), ("i", "Insp"), ("s", "Stop"),
                     ("S", "Start"), ("R", "Rest"), ("d", "Del"),
                     ("q", "Quit"),
                 ]
@@ -1345,8 +1347,8 @@ class DockerTop:
                     self._enqueue_action(f"Removing project {pname}",
                                          ['docker', 'compose', '-p', pname, 'down'])
 
-        # enter -> container shell
-        elif key in (10, 13, ord('\n'), 343, curses.KEY_ENTER):
+        # e -> container shell (exec -it)
+        elif key in (ord('e'),):
             sel = self.get_selected()
             if sel:
                 kind, data = sel
@@ -1360,8 +1362,8 @@ class DockerTop:
                         self._suspend_and_run(
                             ['docker', 'exec', '-it', cid, '/bin/sh'])
 
-        # right -> container logs
-        elif key == curses.KEY_RIGHT:
+        # l -> container logs
+        elif key in (ord('l'),):
             sel = self.get_selected()
             if sel:
                 kind, data = sel
@@ -1375,8 +1377,8 @@ class DockerTop:
                         self._suspend_and_run(
                             ['sh', '-c', f'docker logs -f {cid} 2>&1 | less -R +F'])
 
-        # left -> container inspect
-        elif key == curses.KEY_LEFT:
+        # i -> container inspect
+        elif key in (ord('i'),):
             sel = self.get_selected()
             if sel:
                 kind, data = sel
@@ -1461,9 +1463,9 @@ class DockerTop:
             "  d               Remove container / docker compose down project",
             "",
             " INTERACTIVE (container row only)",
-            "  Enter           docker exec -it <container> /bin/sh",
-            "  \u2192 (Right)     docker logs -f <container> | less -R +F",
-            "  \u2190 (Left)     docker inspect <container> | less -R",
+            "  e               docker exec -it <container> /bin/sh",
+            "  l               docker logs -f <container> | less -R +F",
+            "  i               docker inspect <container> | less -R",
             "                 (press q in less to return)",
             "",
             " MISC",

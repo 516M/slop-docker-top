@@ -593,9 +593,9 @@ class DockerTop:
         mem_pct = min(100, mused / mlimit * 100) if mlimit > 0 else 0
 
         if self.tab == 0:
-            s_cont = (f"Containers: {total}/{running}"
+            s_cont = (f"Containers: {running}/{total}"
                       f"{f', {paused}p' if paused else ''}")
-            s_proj = f"Projects: {pcount}/{rprojects}"
+            s_proj = f"Projects: {rprojects}/{pcount}"
         else:
             sel = len(self._sel_images)
             s_cont = f"Images: {len(self._bg_images)} total"

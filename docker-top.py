@@ -594,13 +594,11 @@ class DockerTop:
             s_cont = (f"Containers: {total}/{running}"
                       f"{f', {paused}p' if paused else ''}")
             s_proj = f"Projects: {pcount}/{rprojects}"
-            s_flt = f"Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}"
         else:
             sel = len(self._sel_images)
             s_cont = f"Images: {len(self._bg_images)} total"
             s_proj = f"{sel} selected" if sel else ""
-            s_flt = f"Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}"
-        status_lines = [s_cont, s_proj, s_flt]
+        status_lines = [s_cont, s_proj]
         max_status = max(len(l) for l in status_lines)
 
         # fixed bar width shared by both meters
@@ -664,13 +662,6 @@ class DockerTop:
         else:
             meter(1, "Cpu ", 0, "─", status_lines[0])
             meter(2, "Mem ", 0, "─", status_lines[1])
-
-        # third status line (Filter) — left-aligned with the status above
-        try:
-            if status_lines[2]:
-                draw_status(3, status_lines[2])
-        except Exception:
-            pass
 
     def draw(self):
         h, w = self.height, self.width = self.stdscr.getmaxyx()
@@ -849,6 +840,14 @@ class DockerTop:
                 msg = msg[:w]
             try:
                 self.stdscr.addstr(h - ft, 0, msg, curses.color_pair(4))
+            except Exception:
+                pass
+        elif self.filter_text:
+            prompt = f" filter: {self.filter_text}"
+            if len(prompt) > w:
+                prompt = prompt[:w]
+            try:
+                self.stdscr.addstr(h - ft, 0, prompt, curses.color_pair(8))
             except Exception:
                 pass
         else:

@@ -852,13 +852,26 @@ class DockerTop:
             except Exception:
                 pass
         else:
-            fkeys = "F1:Help  F3:Search  F4:Filter  F5:Cont  F6:Images  F9:Kill  F10:Quit"
-            if len(fkeys) > w:
-                fkeys = fkeys[:w]
-            try:
-                self.stdscr.addstr(h - ft, 0, fkeys, curses.color_pair(18))
-            except Exception:
-                pass
+            fkey_groups = [
+                ("F1", "Help"), ("F3", "Search"), ("F4", "Filter"),
+                ("F5", "Cont"), ("F6", "Images"), ("F9", "Kill"), ("F10", "Quit"),
+            ]
+            x = 0
+            for i, (key, desc) in enumerate(fkey_groups):
+                try:
+                    self.stdscr.addstr(h - ft, x, key, curses.color_pair(10) | curses.A_BOLD)
+                except Exception:
+                    pass
+                x += len(key)
+                try:
+                    if i == len(fkey_groups) - 1:
+                        remaining = w - x
+                        self.stdscr.addstr(h - ft, x, desc.ljust(remaining), curses.color_pair(18))
+                    else:
+                        self.stdscr.addstr(h - ft, x, desc, curses.color_pair(18))
+                        x += len(desc)
+                except Exception:
+                    pass
 
         self.stdscr.refresh()
 

@@ -850,6 +850,12 @@ class DockerTop:
         elif self.selected_idx >= self.total_lines:
             self.selected_idx = self.total_lines - 1
 
+        # ensure selection is on a selectable item
+        if self.total_lines > 0:
+            lt, _ = self.display_lines[self.selected_idx]
+            if not self._is_selectable(lt):
+                self.selected_idx = self.find_first_row()
+
         max_scroll = max(0, self.total_lines - ch)
         if self.selected_idx < self.scroll_offset:
             self.scroll_offset = self.selected_idx

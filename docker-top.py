@@ -661,8 +661,12 @@ class DockerTop:
             mlim_s = f"{mlimit / 1024**3:.1f}G" if mlimit > 1024**3 else f"{mlimit / 1024**2:.0f}M"
             meter(2, "Mem ", mem_pct, f"{mused_s}/{mlim_s}", status_lines[1])
         else:
-            meter(1, "Cpu ", 0, "─", status_lines[0])
-            meter(2, "Mem ", 0, "─", status_lines[1])
+            img_cnt = len(self._bg_images)
+            sel_cnt = len(self._sel_images)
+            sel_txt = f"  {sel_cnt} sel" if sel_cnt else ""
+            meter(0, "Imgs", 0, f"{img_cnt}", f"Images: {img_cnt}{sel_txt}")
+            meter(1, "Cpu ", 0, "─", "")
+            meter(2, "Mem ", 0, "─", "")
 
     def draw(self):
         h, w = self.height, self.width = self.stdscr.getmaxyx()
@@ -670,6 +674,13 @@ class DockerTop:
         ft = self.ftr_h
 
         # htop-style header: meters + status line
+        # clear header lines first to avoid leftover text from previous tab
+        for yy in range(0, self.hdr_h):
+            try:
+                self.stdscr.move(yy, 0)
+                self.stdscr.clrtoeol()
+            except Exception:
+                pass
         self.draw_header(w)
 
         # tab bar: htop style — active=green bg, inactive=blue bg

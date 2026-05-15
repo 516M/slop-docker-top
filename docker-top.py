@@ -195,7 +195,7 @@ class DockerTop:
         self._sel_images = set()
         threading.Thread(target=self._bg_images_refresh, daemon=True).start()
 
-        self.hdr_h = 1
+        self.hdr_h = 4  # 3 meter bars + 1 status line
         self.ftr_h = 1
 
     def content_height(self):
@@ -530,31 +530,106 @@ class DockerTop:
             self.stdscr.clear()
             self.stdscr.refresh()
 
+    def _parse_size(self, s):
+        s = s.strip()
+        try:
+            if s.endswith('GiB'):
+                return float(s[:-3]) * 1024**3
+            elif s.endswith('MiB'):
+                return float(s[:-3]) * 1024**2
+            elif s.endswith('KiB'):
+                return float(s[:-3]) * 1024
+            elif s.endswith('B'):
+                v = s[:-1].strip()
+                return float(v) if v else 0
+            return float(s)
+        except (ValueError, AttributeError):
+            return 0
+
+    def _compute_metrics(self):
+        running_ct = paused_ct = total_ct = 0
+        total_cpu = 0.0
+        mem_used = mem_limit = 0.0
+        projects = set()
+        for project, containers in self.groups.items():
+            if project:
+                projects.add(project)
+            for c in containers:
+                total_ct += 1
+                st = c.get('State', '')
+                if st == 'running':
+                    running_ct += 1
+                elif st == 'paused':
+                    paused_ct += 1
+                stats = c.get('Stats')
+                if stats:
+                    try:
+                        total_cpu += float(stats.get('CPUPerc', '0').replace('%', ''))
+                    except ValueError:
+                        pass
+                    mu = stats.get('MemUsage', '')
+                    if '/' in mu:
+                        parts = mu.split('/')
+                        mem_used += self._parse_size(parts[0])
+                        mem_limit += self._parse_size(parts[1])
+        if mem_limit == 0:
+            mem_limit = 1
+        return running_ct, total_ct, paused_ct, total_cpu, mem_used, mem_limit, len(projects)
+
+    def draw_header(self, w):
+        running, total, paused, cpu, mused, mlimit, pcount = self._compute_metrics()
+        mem_pct = min(100, mused / mlimit * 100) if mlimit > 0 else 0
+        bar_w = max(10, w - 38)
+
+        def meter(y, label, pct, text):
+            filled = round(pct / 100 * bar_w)
+            bar = '#' * filled + ' ' * (bar_w - filled)
+            line = f" {label} [{bar}] {text}"
+            if len(line) > w:
+                line = line[:w]
+            try:
+                self.stdscr.addstr(y, 0, line, curses.color_pair(6))
+            except Exception:
+                pass
+
+        if self.tab == 0:
+            meter(0, "CONTAINERS", min(100, running / max(1, total) * 100),
+                  f"{running}/{total} running")
+            meter(1, "CPU       ", min(100, cpu), f"{cpu:.1f}%")
+            mused_s = f"{mused / 1024**3:.1f}G" if mused > 1024**3 else f"{mused / 1024**2:.0f}M"
+            mlim_s = f"{mlimit / 1024**3:.1f}G" if mlimit > 1024**3 else f"{mlimit / 1024**2:.0f}M"
+            meter(2, "MEMORY    ", mem_pct, f"{mused_s}/{mlim_s}")
+        else:
+            img_count = len(self._bg_images)
+            meter(0, "IMAGES    ", 0, f"{img_count} total")
+            meter(1, "CPU       ", 0, "─")
+            meter(2, "MEMORY    ", 0, "─")
+
+        # status line
+        if self.tab == 0:
+            status = (f" Tasks: {total} total, {running} running"
+                      f"{f', {paused} paused' if paused else ''}"
+                      f"  |  Projects: {pcount}"
+                      f"  |  Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
+        else:
+            sel = len(self._sel_images)
+            status = (f" Images: {len(self._bg_images)} total"
+                      f"{f', {sel} selected' if sel else ''}"
+                      f"  |  Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
+        if len(status) > w:
+            status = status[:w]
+        try:
+            self.stdscr.addstr(3, 0, status, curses.color_pair(6) | curses.A_DIM)
+        except Exception:
+            pass
+
     def draw(self):
         h, w = self.height, self.width = self.stdscr.getmaxyx()
         ch = self.content_height()
         ft = self.ftr_h
 
-        # header
-        hdr_base = f" docker-top "
-        binds = (f"q:quit  f:filter  r:refresh  "
-                 f"s:stop S:start R:restart d:rm p:pause P:un  "
-                 f"\u2191\u2193:sel  h:help")
-        tab_labels = ["Main", "Images"]
-        x = 0
-        try:
-            self.stdscr.addstr(0, x, hdr_base, curses.color_pair(6) | curses.A_BOLD)
-            x += len(hdr_base)
-            for i, label in enumerate(tab_labels):
-                tab = f" {label} "
-                if i == self.tab:
-                    self.stdscr.addstr(0, x, tab, curses.color_pair(6) | curses.A_REVERSE)
-                else:
-                    self.stdscr.addstr(0, x, tab, curses.A_DIM)
-                x += len(tab)
-            self.stdscr.addstr(0, x, f"  {binds}", curses.color_pair(6))
-        except Exception:
-            self.stdscr.addstr(0, 0, (hdr_base + " ".join(tab_labels) + "  " + binds)[:w])
+        # htop-style header: meters + status line
+        self.draw_header(w)
 
         # build display lines
         self.display_lines = self.build_display_lines()
@@ -660,7 +735,7 @@ class DockerTop:
             except Exception:
                 pass
 
-        # footer
+        # footer — htop-style F-key bar (overridden by pending/filter/command/message)
         try:
             self.stdscr.move(h - ft, 0)
             self.stdscr.clrtoeol()
@@ -684,7 +759,6 @@ class DockerTop:
 
         show_interactive = (sel and kind == 'container' and sel_state == 'running')
 
-        # pending action spinner
         with self._pending_lock:
             has_pending = bool(self._pending)
 
@@ -722,26 +796,11 @@ class DockerTop:
             except Exception:
                 pass
         else:
-            sel_tag = f"[{sel_name}]" if sel_name and not sel_name.startswith('[') else sel_name
-            if show_interactive:
-                st = (f" {sel_tag}  {self.container_count}ct  "
-                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '-'}"
-                       f"  e:sh >:log <:cfg")
-            elif self.tab == 1:
-                count = len(self._bg_images)
-                sel_count = len(self._sel_images)
-                sel_info = f"  {sel_count}sel" if sel_count else ""
-                st = (f" {sel_tag}  {count}img{sel_info}"
-                       f"  filter: {'\"' + self.filter_text + '\"' if self.filter_text else '-'}"
-                       f"  Space:sel u:clear a:all")
-            else:
-                st = (f" {sel_tag} {sel_state}  {self.container_count}ct  "
-                       f"L{self.scroll_offset+1}-{self.scroll_offset+len(visible)}/{self.total_lines}  "
-                       f"filter: {'\"' + self.filter_text + '\"' if self.filter_text else '-'}")
-            if len(st) > w:
-                st = st[:w]
+            fkeys = "F1:Help  F3:Search  F4:Filter  F5:Main  F6:Images  F9:Kill  F10:Quit"
+            if len(fkeys) > w:
+                fkeys = fkeys[:w]
             try:
-                self.stdscr.addstr(h - ft, 0, st, curses.A_DIM)
+                self.stdscr.addstr(h - ft, 0, fkeys, curses.color_pair(6))
             except Exception:
                 pass
 

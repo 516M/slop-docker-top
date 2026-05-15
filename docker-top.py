@@ -599,32 +599,41 @@ class DockerTop:
             sel = len(self._sel_images)
             s_cont = f"Images: {len(self._bg_images)} total"
             s_proj = f"{sel} selected" if sel else ""
-            s_flt = s_cont
-            s_cont = ""
+            s_flt = f"Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}"
         status_lines = [s_cont, s_proj, s_flt]
-        max_status = max(len(l) for l in status_lines) + 2
+        max_status = max(len(l) for l in status_lines)
+
+        # fixed bar width shared by both meters
+        prefix_len = 6   # "  Cpu " or "  Mem " (2 spaces + 4 chars)
+        gap_status = 4    # spaces between ] and status text
+        bar_w = max(10, w - prefix_len - 1 - max_status - gap_status)
 
         def meter(y, label, pct, text, status=""):
-            prefix = f"  {label}["
-            text_part = f"] {text}"
-            bar_w = max(3, w - len(prefix) - len(text_part) - 1 - max_status)
+            pct_str = text
+            pct_len = len(pct_str)
+            bar_idx = 2 + len(label) + 1  # position where bar content starts
             filled = round(pct / 100 * bar_w)
+            pct_pos = bar_w - pct_len    # right-align percentage inside bar
+            fill_end = min(filled, pct_pos)  # don't let fill overlap percentage
             try:
                 self.stdscr.addstr(y, 0, f"  ", curses.A_NORMAL)
                 self.stdscr.addstr(y, 2, label, curses.color_pair(1))
                 self.stdscr.addstr(y, 2 + len(label), "[", curses.A_BOLD)
-                if filled:
-                    self.stdscr.addstr(y, 2 + len(label) + 1, '|' * filled, curses.color_pair(2))
-                if bar_w - filled:
-                    self.stdscr.addstr(y, 2 + len(label) + 1 + filled, ' ' * (bar_w - filled), curses.A_NORMAL)
-                self.stdscr.addstr(y, 2 + len(label) + 1 + bar_w, "]", curses.A_NORMAL)
-                self.stdscr.addstr(y, 2 + len(label) + 2 + bar_w, text, curses.color_pair(19))
+                if fill_end > 0:
+                    self.stdscr.addstr(y, bar_idx, '|' * fill_end, curses.color_pair(2))
+                if fill_end < pct_pos:
+                    self.stdscr.addstr(y, bar_idx + fill_end, ' ' * (pct_pos - fill_end), curses.A_NORMAL)
+                self.stdscr.addstr(y, bar_idx + pct_pos, pct_str, curses.color_pair(19))
+                after_pct = pct_pos + pct_len
+                if after_pct < bar_w:
+                    self.stdscr.addstr(y, bar_idx + after_pct, ' ' * (bar_w - after_pct), curses.A_NORMAL)
+                self.stdscr.addstr(y, bar_idx + bar_w, "]", curses.A_NORMAL)
                 if status:
-                    sx = 2 + len(label) + 2 + bar_w + len(text) + 1
-                    self.stdscr.addstr(y, sx, status, curses.color_pair(19))
+                    sx = bar_idx + bar_w + 1
+                    self.stdscr.addstr(y, sx, " " * gap_status + status, curses.color_pair(1))
             except Exception:
-                line = f"  {label}[{'|' * filled}{' ' * (bar_w - filled)}] {text}  {status}"
-                self.stdscr.addstr(y, 0, line[:w], curses.A_NORMAL)
+                bar = f"{'|' * fill_end}{' ' * (pct_pos - fill_end)}{pct_str}{' ' * (bar_w - after_pct)}"
+                self.stdscr.addstr(y, 0, f"  {label}[{bar}]   {status}"[:w], curses.A_NORMAL)
 
         if self.tab == 0:
             meter(1, "Cpu ", min(100, cpu), f"{cpu:.1f}%", status_lines[0])
@@ -632,13 +641,13 @@ class DockerTop:
             mlim_s = f"{mlimit / 1024**3:.1f}G" if mlimit > 1024**3 else f"{mlimit / 1024**2:.0f}M"
             meter(2, "Mem ", mem_pct, f"{mused_s}/{mlim_s}", status_lines[1])
         else:
-            meter(1, "Cpu ", 0, "─")
-            meter(2, "Mem ", 0, "─")
+            meter(1, "Cpu ", 0, "─", status_lines[0])
+            meter(2, "Mem ", 0, "─", status_lines[1])
 
         # third status line (Filter) on line 3, right-aligned
         try:
             if status_lines[2]:
-                self.stdscr.addstr(3, w - len(status_lines[2]) - 1, f" {status_lines[2]}", curses.color_pair(19))
+                self.stdscr.addstr(3, w - len(status_lines[2]) - 1, f" {status_lines[2]}", curses.color_pair(1))
         except Exception:
             pass
 

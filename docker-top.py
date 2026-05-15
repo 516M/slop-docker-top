@@ -156,12 +156,18 @@ class DockerTop:
         curses.init_pair(8, curses.COLOR_BLACK, curses.COLOR_WHITE)
         curses.init_pair(9, curses.COLOR_MAGENTA, -1)
         curses.init_pair(10, curses.COLOR_WHITE, curses.COLOR_BLACK)
-        # htop meter bar fills (foreground on header blue background)
-        curses.init_pair(13, curses.COLOR_GREEN, curses.COLOR_BLUE)
-        curses.init_pair(14, curses.COLOR_YELLOW, curses.COLOR_BLUE)
-        curses.init_pair(15, curses.COLOR_RED, curses.COLOR_BLUE)
-        # htop selection: white on blue
-        curses.init_pair(12, curses.COLOR_WHITE, curses.COLOR_BLUE)
+        # htop exact colors:
+        # active tab / column header: black on green
+        curses.init_pair(16, curses.COLOR_BLACK, curses.COLOR_GREEN)
+        # inactive tab: black on blue
+        curses.init_pair(17, curses.COLOR_BLACK, curses.COLOR_BLUE)
+        # F-key bar: black on cyan
+        curses.init_pair(18, curses.COLOR_BLACK, curses.COLOR_CYAN)
+        # dark gray / bright black for percentages and status (use dim on basic terms)
+        if curses.COLORS >= 256:
+            curses.init_pair(19, 8, -1)   # bright black foreground
+        else:
+            curses.init_pair(19, curses.COLOR_WHITE, -1)  # fallback
 
         try:
             curses.curs_set(0)
@@ -392,7 +398,7 @@ class DockerTop:
         if width < len(cols):
             cols = cols[:width]
         try:
-            w.addstr(y, x, cols, curses.A_BOLD)
+            w.addstr(y, x, cols, curses.color_pair(16))
         except Exception:
             pass
 
@@ -583,14 +589,20 @@ class DockerTop:
             bar_w = max(3, w - len(prefix) - len(text_part) - 1)
             filled = round(pct / 100 * bar_w)
             try:
-                self.stdscr.addstr(y, 0, prefix, curses.A_BOLD)
+                # label in cyan
+                self.stdscr.addstr(y, 0, f"  ", curses.A_NORMAL)
+                self.stdscr.addstr(y, 2, label, curses.color_pair(1))
+                self.stdscr.addstr(y, 2 + len(label), "[", curses.A_BOLD)
                 if filled:
-                    self.stdscr.addstr(y, len(prefix), '|' * filled, curses.color_pair(2) | curses.A_BOLD)
+                    # green | for the filled portion
+                    self.stdscr.addstr(y, 2 + len(label) + 1, '|' * filled, curses.color_pair(2))
                 if bar_w - filled:
-                    self.stdscr.addstr(y, len(prefix) + filled, ' ' * (bar_w - filled), curses.A_NORMAL)
-                self.stdscr.addstr(y, len(prefix) + bar_w, text_part, curses.A_NORMAL)
+                    self.stdscr.addstr(y, 2 + len(label) + 1 + filled, ' ' * (bar_w - filled), curses.A_NORMAL)
+                # ] and text in gray
+                self.stdscr.addstr(y, 2 + len(label) + 1 + bar_w, "]", curses.A_NORMAL)
+                self.stdscr.addstr(y, 2 + len(label) + 2 + bar_w, text, curses.color_pair(19))
             except Exception:
-                line = f"{prefix}{'|' * filled}{' ' * (bar_w - filled)}{text_part}"
+                line = f"  {label}[{'|' * filled}{' ' * (bar_w - filled)}] {text}"
                 self.stdscr.addstr(y, 0, line[:w], curses.A_NORMAL)
 
         if self.tab == 0:
@@ -616,7 +628,7 @@ class DockerTop:
         if len(status) > w:
             status = status[:w]
         try:
-            self.stdscr.addstr(2, 0, status, curses.A_DIM)
+            self.stdscr.addstr(2, 0, status, curses.color_pair(19))
         except Exception:
             pass
 
@@ -628,16 +640,16 @@ class DockerTop:
         # htop-style header: meters + status line
         self.draw_header(w)
 
-        # tab bar: below status line, above content
+        # tab bar: htop style — active=green bg, inactive=blue bg
         tab_labels = ["Containers", "Images"]
         try:
             x = 0
             for i, label in enumerate(tab_labels):
-                entry = f"  {label}  "
+                entry = f" {label} "
                 if i == self.tab:
-                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.A_REVERSE)
+                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.color_pair(16))
                 else:
-                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.A_DIM)
+                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.color_pair(17))
                 x += len(entry)
         except Exception:
             tab_line = "  ".join(f"[{l}]" if i == self.tab else f" {l} " for i, l in enumerate(tab_labels))
@@ -705,7 +717,7 @@ class DockerTop:
                     if len(cols) > w:
                         cols = cols[:w]
                     try:
-                        self.stdscr.addstr(yy, 0, cols, curses.A_BOLD)
+                        self.stdscr.addstr(yy, 0, cols, curses.color_pair(16))
                     except Exception:
                         pass
                 elif lt == 'irow':
@@ -802,7 +814,7 @@ class DockerTop:
             if len(fkeys) > w:
                 fkeys = fkeys[:w]
             try:
-                self.stdscr.addstr(h - ft, 0, fkeys, curses.A_REVERSE)
+                self.stdscr.addstr(h - ft, 0, fkeys, curses.color_pair(18))
             except Exception:
                 pass
 

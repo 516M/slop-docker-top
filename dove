@@ -343,7 +343,7 @@ class DockerTop:
             if ft and not fcontainers and not proj_matches:
                 continue
 
-            if not first_visible:
+            if not first_visible and not self._collapsed:
                 lines.append(('blank', ''))
             first_visible = False
             if project:

@@ -428,7 +428,7 @@ class DockerTop:
         return (cid_short, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending)
 
     def draw_cols(self, w, y, x, width):
-        cols = (f" {'#':>4} {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU%':<5} {'MEM%':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
+        cols = (f"{'#':<4} {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU%':<5} {'MEM%':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
         try:
             w.addstr(y, x, cols[:width].ljust(width), curses.color_pair(16))
         except Exception:
@@ -439,7 +439,7 @@ class DockerTop:
         n = name[:22].ljust(22) if len(name) > 22 else name.ljust(22)
         c = cid[:12].ljust(12)
         s = stat[:12].ljust(12)
-        fmt = f" {lineno:>4} {c} {n} {s} {cpu_bar:>5} {mem_bar:>5} {mem_u:22} {net:18} {blk:18} {pids:>5}"
+        fmt = f"{lineno:<4} {c} {n} {s} {cpu_bar:>5} {mem_bar:>5} {mem_u:22} {net:18} {blk:18} {pids:>5}"
         if len(fmt) > width:
             fmt = fmt[:width]
 
@@ -886,7 +886,7 @@ class DockerTop:
                         attr = curses.A_DIM | curses.color_pair(4)
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
-                    self.stdscr.addstr(yy, 0, ("     " + str(text)).ljust(w)[:w], attr)
+                    self.stdscr.addstr(yy, 0, ("    " + str(text)).ljust(w)[:w], attr)
                 elif lt == 'sheader':
                     text, has_running = data
                     if has_running:
@@ -895,7 +895,7 @@ class DockerTop:
                         attr = curses.color_pair(4) | curses.A_DIM
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
-                    self.stdscr.addstr(yy, 0, ("     " + str(text)).ljust(w)[:w], attr)
+                    self.stdscr.addstr(yy, 0, ("    " + str(text)).ljust(w)[:w], attr)
                 elif lt == 'colhdr':
                     self.draw_cols(self.stdscr, yy, 0, w)
                 elif lt == 'row':
@@ -905,7 +905,7 @@ class DockerTop:
                                   selected=(abs_idx == self.selected_idx),
                                   lineno=lineno)
                 elif lt == 'icolhdr':
-                    cols = "    # REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
+                    cols = "#   REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
                     try:
                         self.stdscr.addstr(yy, 0, cols[:w].ljust(w), curses.color_pair(16))
                     except Exception:
@@ -921,7 +921,7 @@ class DockerTop:
                     iid = iid[:19].ljust(19) if len(iid) > 19 else iid.ljust(19)
                     size_s = str(size)[:14].ljust(14) if len(str(size)) > 14 else str(size).ljust(14)
                     created_s = str(created)[:14].ljust(14) if len(str(created)) > 14 else str(created).ljust(14)
-                    fmt = f" {lineno:>4} {repo} {tag} {iid} {size_s} {created_s}"
+                    fmt = f"{lineno:<4} {repo} {tag} {iid} {size_s} {created_s}"
                     if len(fmt) > w - 2:
                         fmt = fmt[:w - 2]
                     if abs_idx == self.selected_idx:
@@ -938,7 +938,7 @@ class DockerTop:
                 elif lt == 'blank':
                     pass
                 elif lt == 'empty':
-                    self.stdscr.addstr(yy, 0, ("     " + str(data))[:w], curses.A_DIM)
+                    self.stdscr.addstr(yy, 0, ("    " + str(data))[:w], curses.A_DIM)
             except Exception:
                 pass
 

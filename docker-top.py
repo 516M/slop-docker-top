@@ -194,7 +194,7 @@ class DockerTop:
         self._sel_images = set()
         threading.Thread(target=self._bg_images_refresh, daemon=True).start()
 
-        self.hdr_h = 4  # 3 meter bars + 1 status line
+        self.hdr_h = 5  # 3 meter bars + 1 status line + 1 tab bar
         self.ftr_h = 1
 
     def content_height(self):
@@ -628,6 +628,21 @@ class DockerTop:
         # htop-style header: meters + status line
         self.draw_header(w)
 
+        # tab bar: below status line, above content
+        tab_labels = ["Containers", "Images"]
+        try:
+            x = 0
+            for i, label in enumerate(tab_labels):
+                entry = f" {label} "
+                if i == self.tab:
+                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.color_pair(6) | curses.A_REVERSE)
+                else:
+                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.A_DIM)
+                x += len(entry)
+        except Exception:
+            tab_line = " ".join(f"[{l}]" if i == self.tab else f" {l} " for i, l in enumerate(tab_labels))
+            self.stdscr.addstr(self.hdr_h - 1, 0, tab_line[:w], curses.color_pair(6))
+
         # build display lines
         self.display_lines = self.build_display_lines()
         self.total_lines = len(self.display_lines)
@@ -783,7 +798,7 @@ class DockerTop:
             except Exception:
                 pass
         else:
-            fkeys = "F1:Help  F3:Search  F4:Filter  F5:Main  F6:Images  F9:Kill  F10:Quit"
+            fkeys = "F1:Help  F3:Search  F4:Filter  F5:Cont  F6:Images  F9:Kill  F10:Quit"
             if len(fkeys) > w:
                 fkeys = fkeys[:w]
             try:

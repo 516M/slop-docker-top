@@ -2,7 +2,7 @@
 
 htop-like TUI for Docker containers, grouped by compose project. Shows real-time CPU, memory, network, block I/O, PIDs, and status with color coding. Supports filtering, scrolling, and container/project-level actions.
 
-![screenshot](screenshot.png)
+![screenshot](scr.gif)
 
 ## Features
 

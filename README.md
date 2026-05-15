@@ -86,7 +86,7 @@ All actions prompt with confirmation before executing and run in background thre
 
 | File | Purpose |
 |------|---------|
-| `docker-top` | Standalone bash+Python script (single file, no deps) |
+| `dove` | Standalone bash+Python script (single file, no deps) |
 
 ## License
 

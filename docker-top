@@ -4,6 +4,12 @@
 
 set -e
 
+# Idempotent self-install to /usr/local/bin
+if [ "$(readlink -f "$0" 2>/dev/null)" != "/usr/local/bin/docker-top" ] && \
+   [ "$(readlink -f /usr/local/bin/docker-top 2>/dev/null)" != "$(readlink -f "$0")" ]; then
+    ln -sf "$(readlink -f "$0")" /usr/local/bin/docker-top 2>/dev/null || true
+fi
+
 SCRIPT=$(cat << 'PYEOF'
 #!/usr/bin/env python3
 """

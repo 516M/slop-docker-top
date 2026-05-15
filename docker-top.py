@@ -608,55 +608,8 @@ class DockerTop:
 
         # fixed bar width shared by both meters
         prefix_len = 6   # "  Cpu " or "  Mem " (2 spaces + 4 chars)
-        gap_status = 2    # spaces between percentage and status text
-        pct_extra = 5    # room for " 0.0%" (space + 4 chars minimum)
-        bar_w = max(10, w - prefix_len - 2 - pct_extra - gap_status - max_status)  # -2 for [ and ]
-        status_x = 2 + len("Cpu ") + 1 + bar_w + 1  # right after the ]
-
-        def draw_status(y, text):
-            """Draw status text: running numbers in bold green, (none) in gray."""
-            if not text:
-                return
-            cx = status_x
-            for m in re.finditer(r'(\d+)(?= running)|(\(\w+\))', text):
-                if m.start() > cx - status_x:
-                    self.stdscr.addstr(y, cx, text[cx - status_x:m.start()],
-                                       curses.color_pair(1))
-                    cx += m.start() - (cx - status_x)
-                if m.group(1):  # number before "running"
-                    self.stdscr.addstr(y, cx, m.group(1),
-                                       curses.A_BOLD | curses.color_pair(2))
-                    cx += len(m.group(1))
-                elif m.group(2):  # (none) or similar
-                    self.stdscr.addstr(y, cx, m.group(2),
-                                       curses.color_pair(19))
-                    cx += len(m.group(2))
-            if cx - status_x < len(text):
-                self.stdscr.addstr(y, cx, text[cx - status_x:], curses.color_pair(1))
-
-        def meter(y, label, pct, text, status=""):
-            pct_str = text
-            bar_idx = 2 + len(label) + 1
-            filled = round(pct / 100 * bar_w)
-            empty = bar_w - filled
-            try:
-                self.stdscr.addstr(y, 0, f"  ", curses.A_NORMAL)
-                self.stdscr.addstr(y, 2, label, curses.color_pair(1))
-                self.stdscr.addstr(y, 2 + len(label), "[", curses.A_BOLD)
-                if filled:
-                    self.stdscr.addstr(y, bar_idx, '|' * filled, curses.color_pair(2))
-                if empty:
-                    self.stdscr.addstr(y, bar_idx + filled, ' ' * empty, curses.A_NORMAL)
-                self.stdscr.addstr(y, bar_idx + bar_w, "]", curses.A_NORMAL)
-                # percentage after the bar
-                cx = bar_idx + bar_w + 1
-                self.stdscr.addstr(y, cx, f" {pct_str}", curses.color_pair(19))
-                cx += 1 + len(pct_str) + gap_status
-                if status:
-                    draw_status_at(y, cx, status)
-            except Exception:
-                line = f"  {label}[{'|' * filled}{' ' * empty}] {pct_str}  {status}"
-                self.stdscr.addstr(y, 0, line[:w], curses.A_NORMAL)
+        gap_status = 2    # spaces after the bar
+        bar_w = max(10, w - prefix_len - 2 - gap_status - max_status - 1)  # -2 for [ and ]
 
         def draw_status_at(y, x, text):
             if not text:
@@ -674,6 +627,33 @@ class DockerTop:
                     cx += len(m.group(2))
             if cx - x < len(text):
                 self.stdscr.addstr(y, cx, text[cx - x:], curses.color_pair(1))
+
+        def meter(y, label, pct, text, status=""):
+            pct_str = text
+            pct_len = len(pct_str)
+            bar_idx = 2 + len(label) + 1
+            filled = round(pct / 100 * bar_w)
+            pct_pos = bar_w - pct_len       # right-align percentage inside bar
+            fill_end = min(filled, pct_pos)  # don't overlap percentage
+            after_pct = pct_pos + pct_len
+            try:
+                self.stdscr.addstr(y, 0, f"  ", curses.A_NORMAL)
+                self.stdscr.addstr(y, 2, label, curses.color_pair(1))
+                self.stdscr.addstr(y, 2 + len(label), "[", curses.A_BOLD)
+                if fill_end:
+                    self.stdscr.addstr(y, bar_idx, '|' * fill_end, curses.color_pair(2))
+                if fill_end < pct_pos:
+                    self.stdscr.addstr(y, bar_idx + fill_end, ' ' * (pct_pos - fill_end), curses.A_NORMAL)
+                self.stdscr.addstr(y, bar_idx + pct_pos, pct_str, curses.color_pair(19))
+                if after_pct < bar_w:
+                    self.stdscr.addstr(y, bar_idx + after_pct, ' ' * (bar_w - after_pct), curses.A_NORMAL)
+                self.stdscr.addstr(y, bar_idx + bar_w, "]", curses.A_NORMAL)
+                if status:
+                    sx = bar_idx + bar_w + 1 + gap_status
+                    draw_status_at(y, sx, status)
+            except Exception:
+                bar = f"{'|' * fill_end}{' ' * (pct_pos - fill_end)}{pct_str}{' ' * (bar_w - after_pct)}"
+                self.stdscr.addstr(y, 0, f"  {label}[{bar}]   {status}"[:w], curses.A_NORMAL)
 
         if self.tab == 0:
             meter(1, "Cpu ", min(100, cpu), f"{cpu:.1f}%", status_lines[0])

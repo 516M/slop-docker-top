@@ -298,6 +298,10 @@ class DockerTop:
         self.container_count = 0
         ft = self.filter_text.lower().strip() if self.filter_text else ''
 
+        # single column header bar below the tab separator
+        if self.groups:
+            lines.append(('colhdr', ''))
+
         for project, containers in self.groups.items():
             fcontainers = containers
             proj_matches = False
@@ -322,7 +326,6 @@ class DockerTop:
                 lines.append(('empty', '  (none match filter)'))
                 continue
 
-            lines.append(('colhdr', ''))
             for c in fcontainers:
                 lines.append(('row', c))
                 self.container_count += 1

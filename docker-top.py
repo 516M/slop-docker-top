@@ -544,12 +544,22 @@ class DockerTop:
     def _parse_size(self, s):
         s = s.strip()
         try:
-            if s.endswith('GiB'):
+            if s.endswith('TiB'):
+                return float(s[:-3]) * 1024**4
+            elif s.endswith('GiB'):
                 return float(s[:-3]) * 1024**3
             elif s.endswith('MiB'):
                 return float(s[:-3]) * 1024**2
             elif s.endswith('KiB'):
                 return float(s[:-3]) * 1024
+            elif s.endswith('TB'):
+                return float(s[:-2]) * 1000**4
+            elif s.endswith('GB'):
+                return float(s[:-2]) * 1000**3
+            elif s.endswith('MB'):
+                return float(s[:-2]) * 1000**2
+            elif s.endswith('KB'):
+                return float(s[:-2]) * 1000
             elif s.endswith('B'):
                 v = s[:-1].strip()
                 return float(v) if v else 0
@@ -662,11 +672,30 @@ class DockerTop:
             meter(2, "Mem ", mem_pct, f"{mused_s}/{mlim_s}", status_lines[1])
         else:
             img_cnt = len(self._bg_images)
+            total_bytes = sum(self._parse_size(img.get('Size', '0B'))
+                              for img in self._bg_images)
             sel_cnt = len(self._sel_images)
-            sel_txt = f"  {sel_cnt} sel" if sel_cnt else ""
-            meter(0, "Imgs", 0, f"{img_cnt}", f"Images: {img_cnt}{sel_txt}")
-            meter(1, "Cpu ", 0, "─", "")
-            meter(2, "Mem ", 0, "─", "")
+            size_g = total_bytes / 1024**3
+            if size_g >= 1.0:
+                size_str = f"{size_g:.1f}G"
+            elif total_bytes >= 1024**2:
+                size_str = f"{total_bytes / 1024**2:.0f}M"
+            else:
+                size_str = f"{total_bytes / 1024:.0f}K"
+            try:
+                self.stdscr.addstr(0, 0, "  Images", curses.color_pair(1))
+                self.stdscr.addstr(0, 8, f"{img_cnt}", curses.A_BOLD)
+                self.stdscr.addstr(0, 8 + len(str(img_cnt)), " total", curses.A_NORMAL)
+                # right-align size
+                self.stdscr.addstr(0, w - len(size_str) - 1, size_str, curses.color_pair(19))
+            except Exception:
+                pass
+            if sel_cnt:
+                try:
+                    self.stdscr.addstr(1, 0, f"  Selected: {sel_cnt}",
+                                       curses.color_pair(4))
+                except Exception:
+                    pass
 
     def draw(self):
         h, w = self.height, self.width = self.stdscr.getmaxyx()

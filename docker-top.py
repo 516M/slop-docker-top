@@ -607,6 +607,28 @@ class DockerTop:
         prefix_len = 6   # "  Cpu " or "  Mem " (2 spaces + 4 chars)
         gap_status = 4    # spaces between ] and status text
         bar_w = max(10, w - prefix_len - 1 - max_status - gap_status)
+        status_x = 2 + len("Cpu ") + 1 + bar_w + 1 + gap_status  # common x for status
+
+        def draw_status(y, text):
+            """Draw status text: running numbers in bold green, (none) in gray."""
+            if not text:
+                return
+            cx = status_x
+            for m in re.finditer(r'(\d+)(?= running)|(\(\w+\))', text):
+                if m.start() > cx - status_x:
+                    self.stdscr.addstr(y, cx, text[cx - status_x:m.start()],
+                                       curses.color_pair(1))
+                    cx += m.start() - (cx - status_x)
+                if m.group(1):  # number before "running"
+                    self.stdscr.addstr(y, cx, m.group(1),
+                                       curses.A_BOLD | curses.color_pair(2))
+                    cx += len(m.group(1))
+                elif m.group(2):  # (none) or similar
+                    self.stdscr.addstr(y, cx, m.group(2),
+                                       curses.color_pair(19))
+                    cx += len(m.group(2))
+            if cx - status_x < len(text):
+                self.stdscr.addstr(y, cx, text[cx - status_x:], curses.color_pair(1))
 
         def meter(y, label, pct, text, status=""):
             pct_str = text
@@ -629,8 +651,7 @@ class DockerTop:
                     self.stdscr.addstr(y, bar_idx + after_pct, ' ' * (bar_w - after_pct), curses.A_NORMAL)
                 self.stdscr.addstr(y, bar_idx + bar_w, "]", curses.A_NORMAL)
                 if status:
-                    sx = bar_idx + bar_w + 1
-                    self.stdscr.addstr(y, sx, " " * gap_status + status, curses.color_pair(1))
+                    draw_status(y, status)
             except Exception:
                 bar = f"{'|' * fill_end}{' ' * (pct_pos - fill_end)}{pct_str}{' ' * (bar_w - after_pct)}"
                 self.stdscr.addstr(y, 0, f"  {label}[{bar}]   {status}"[:w], curses.A_NORMAL)
@@ -644,10 +665,10 @@ class DockerTop:
             meter(1, "Cpu ", 0, "─", status_lines[0])
             meter(2, "Mem ", 0, "─", status_lines[1])
 
-        # third status line (Filter) on line 3, right-aligned
+        # third status line (Filter) — left-aligned with the status above
         try:
             if status_lines[2]:
-                self.stdscr.addstr(3, w - len(status_lines[2]) - 1, f" {status_lines[2]}", curses.color_pair(1))
+                draw_status(3, status_lines[2])
         except Exception:
             pass
 

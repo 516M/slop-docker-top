@@ -30,6 +30,10 @@ def _detect_sudo():
     user can enter their sudo password once; subsequent background
     sudo calls use the cached credential (no prompting)."""
     global _use_sudo
+    if 'SUDO_USER' in os.environ:
+        # Running under sudo — tool handles sudo internally, no need
+        _use_sudo = False
+        return
     try:
         r = subprocess.run(['docker', 'ps'], capture_output=True, text=True, timeout=5)
         if r.returncode == 0:
@@ -38,19 +42,13 @@ def _detect_sudo():
     except Exception:
         pass
 
-    # docker ps failed — try to cache sudo credentials via sudo -v
-    # This prompts for a password if needed, then caches it so
-    # background threads can use sudo without interaction.
     try:
         r = subprocess.run(['sudo', '-v'], timeout=15)
         if r.returncode != 0:
-            _use_sudo = False
             return
     except Exception:
-        _use_sudo = False
         return
 
-    # Credentials cached — verify docker actually works with sudo
     try:
         r = subprocess.run(['sudo', 'docker', 'ps'], capture_output=True, text=True, timeout=5)
         _use_sudo = (r.returncode == 0)

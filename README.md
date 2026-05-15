@@ -1,4 +1,4 @@
-# docker-top
+# dove
 
 htop-like TUI for Docker containers, grouped by compose project. Shows real-time CPU, memory, network, block I/O, PIDs, and status with color coding. Supports filtering, scrolling, and container/project-level actions.
 
@@ -9,17 +9,20 @@ htop-like TUI for Docker containers, grouped by compose project. Shows real-time
 - **Grouped by compose project** — containers organized under their project headers
 - **Real-time stats** — CPU%, MEM%, memory usage/limit, NET I/O, BLOCK I/O, PIDs
 - **Streaming stats** — single persistent `docker stats` connection, no polling overhead
-- **Color coding** — green=running, red=exited, yellow=paused, yellow bold=action in progress
+- **Color coding** — green=running, red=stopping, yellow=starting/paused, dim=exited
 - **Container actions** — stop, start, restart, pause, unpause, remove (all async, non-blocking)
 - **Project actions** — act on entire compose project at once
 - **Async operations** — docker commands run in background threads, UI stays responsive
 - **Filtering** — filter by container name or project name
+- **Line numbering** — all listings numbered from left edge
+- **Collapse mode** — `H` to collapse/expand project containers
 - **Keyboard navigation** — arrow keys, vim-style j/k, page up/down, home/end
+- **Interactive views** — `e` to exec shell, `l` for logs, `i` for inspect
 
 ## Quick start
 
 ```bash
-docker-top
+dove
 ```
 
 On NixOS, the launcher automatically uses `nix-shell -p python3`. On other distros, it falls back to the system `python3`.
@@ -83,8 +86,7 @@ All actions prompt with confirmation before executing and run in background thre
 
 | File | Purpose |
 |------|---------|
-| `docker-top` | Bash launcher — detects nix-shell, execs the Python script |
-| `docker-top.py` | Python TUI implementation (runnable directly with `#!/usr/bin/env python3`) |
+| `docker-top` | Standalone bash+Python script (single file, no deps) |
 
 ## License
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# docker-top - container monitor TUI (standalone)
+# dove - container overview TUI (standalone)
 # Embeds the Python implementation and auto-detects nix-shell or python3.
 
 set -e
@@ -7,7 +7,7 @@ set -e
 SCRIPT=$(cat << 'PYEOF'
 #!/usr/bin/env python3
 """
-docker-top - htop-like TUI for Docker containers, grouped by compose project.
+dove - htop-like TUI for Docker containers, grouped by compose project.
 Shows CPU, memory, network, block I/O, PIDs, and status with color coding.
 Supports filtering, scrolling, container actions, and keyboard navigation.
 """
@@ -1411,7 +1411,7 @@ class DockerTop:
     def show_help(self):
         h, w = self.stdscr.getmaxyx()
         help_lines = [
-            " docker-top help",
+            " dove help",
             "",
             " NAVIGATION",
             "  \u2191/k / \u2193/j     Move selection up/down (project headers too)",
@@ -1483,7 +1483,7 @@ class DockerTop:
 
         for i, line in enumerate(help_lines):
             try:
-                if line.startswith(" docker-top"):
+                if line.startswith(" dove"):
                     self.stdscr.addstr(box_y + 1 + i, box_x + 2, line, curses.A_BOLD)
                 elif line and not line.startswith(" "):
                     self.stdscr.addstr(box_y + 1 + i, box_x + 2, line, curses.color_pair(1) | curses.A_BOLD)
@@ -1512,13 +1512,13 @@ if __name__ == '__main__':
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print(f"docker-top error: {e}", file=__import__('sys').stderr)
+        print(f"dove error: {e}", file=__import__('sys').stderr)
         __import__('sys').exit(1)
 PYEOF
 )
 
 # Write Python code to a temp file, run it, clean up
-TMP=$(mktemp /tmp/docker-top.XXXXXX.py)
+TMP=$(mktemp /tmp/dove.XXXXXX.py)
 trap 'rm -f "$TMP"' EXIT
 printf '%s\n' "$SCRIPT" > "$TMP"
 chmod +x "$TMP"

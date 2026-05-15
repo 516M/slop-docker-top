@@ -396,7 +396,21 @@ class DockerTop:
         state = c.get('State', '?')
         status = c.get('Status', '')
         image = c.get('Image', '?')[:30]
-        ports = c.get('Ports', '')[:40]
+        ports_raw = c.get('Ports', '')
+
+        # parse docker port mappings: "0.0.0.0:80->80/tcp, [::]:80->80/tcp" -> "80/tcp"
+        port_parts = []
+        seen = set()
+        if ports_raw:
+            for m in ports_raw.split(', '):
+                if '->' in m:
+                    _, right = m.split('->', 1)
+                    if right not in seen:
+                        seen.add(right)
+                        port_parts.append(right)
+        ports_display = ', '.join(port_parts)[:30] if port_parts else ''
+        ports_display = ports_display if port_parts else '-'
+
         cid_short = cid[:12] if len(cid) > 12 else cid
         if c.get('Stats'):
             s = c['Stats']
@@ -425,10 +439,10 @@ class DockerTop:
                     break
         cpu_bar = cpu
         mem_bar = mem_p
-        return (cid_short, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending)
+        return (cid_short, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports_display, image, pending)
 
     def draw_cols(self, w, y, x, width):
-        cols = (f"{'#':<4} {'ID':<12} {'NAME':<22} {'STATUS':<12} {'CPU%':<5} {'MEM%':<5} {'MEM USAGE':<22} {'NET I/O':<18} {'BLOCK I/O':<18} {'PIDS':>5}")
+        cols = (f"{'#':<4} {'ID':<12} {'NAME':<14} {'STATUS':<8} {'CPU%':>5} {'MEM%':>5} {'MEM USAGE':<10} {'PORTS':<12}{'PIDS':>4}")
         try:
             w.addstr(y, x, cols[:width].ljust(width), curses.color_pair(16))
         except Exception:
@@ -436,10 +450,13 @@ class DockerTop:
 
     def draw_row(self, w, y, x, width, row_data, selected=False, lineno=0):
         cid, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending = row_data
-        n = name[:22].ljust(22) if len(name) > 22 else name.ljust(22)
+        n = name[:14].ljust(14) if len(name) > 14 else name.ljust(14)
         c = cid[:12].ljust(12)
-        s = stat[:12].ljust(12)
-        fmt = f"{lineno:<4} {c} {n} {s} {cpu_bar:>5} {mem_bar:>5} {mem_u:22} {net:18} {blk:18} {pids:>5}"
+        s = stat[:8].ljust(8)
+        prefix = f"{lineno:<4} {c} {n} {s} {cpu_bar:>5} {mem_bar:>5} {mem_u:10} "
+        port_str = f"{ports:12}"
+        suffix = f"{pids:>4}"
+        fmt = prefix + port_str + suffix
         if len(fmt) > width:
             fmt = fmt[:width]
 
@@ -462,9 +479,12 @@ class DockerTop:
             attr = curses.A_NORMAL
 
         try:
-            w.addstr(y, x, fmt, attr)
+            # draw prefix with state-based color, PORTS in cyan
+            w.addstr(y, x, prefix, attr)
+            w.addstr(y, x + len(prefix), port_str, curses.color_pair(1))
+            w.addstr(y, x + len(prefix) + len(port_str), suffix, attr)
         except Exception:
-            pass
+            w.addstr(y, x, fmt, attr)
 
     def _is_selectable(self, lt):
         return lt in ('row', 'pheader', 'irow')

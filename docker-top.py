@@ -682,18 +682,23 @@ class DockerTop:
                 size_str = f"{total_bytes / 1024**2:.0f}M"
             else:
                 size_str = f"{total_bytes / 1024:.0f}K"
+            val_col = 14  # aligned column for values
             try:
-                self.stdscr.addstr(0, 0, "  Images", curses.color_pair(1))
-                self.stdscr.addstr(0, 8, f"{img_cnt}", curses.A_BOLD)
-                self.stdscr.addstr(0, 8 + len(str(img_cnt)), " total", curses.A_NORMAL)
-                # right-align size
-                self.stdscr.addstr(0, w - len(size_str) - 1, size_str, curses.color_pair(19))
+                # line 0: Images count
+                self.stdscr.addstr(0, 0, "  Images:", curses.color_pair(1))
+                self.stdscr.addstr(0, val_col, str(img_cnt), curses.A_BOLD)
+            except Exception:
+                pass
+            try:
+                # line 1: total size
+                self.stdscr.addstr(1, 0, "  Size:", curses.color_pair(1))
+                self.stdscr.addstr(1, val_col, size_str, curses.color_pair(19))
             except Exception:
                 pass
             if sel_cnt:
                 try:
-                    self.stdscr.addstr(1, 0, f"  Selected: {sel_cnt}",
-                                       curses.color_pair(4))
+                    self.stdscr.addstr(2, 0, "  Selected:", curses.color_pair(1))
+                    self.stdscr.addstr(2, val_col, str(sel_cnt), curses.color_pair(4))
                 except Exception:
                     pass
 

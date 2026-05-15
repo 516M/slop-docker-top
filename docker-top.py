@@ -194,7 +194,7 @@ class DockerTop:
         self._sel_images = set()
         threading.Thread(target=self._bg_images_refresh, daemon=True).start()
 
-        self.hdr_h = 5  # 3 meter bars + 1 status line + 1 tab bar
+        self.hdr_h = 4  # 2 meter bars + 1 status line + 1 tab bar
         self.ftr_h = 1
 
     def content_height(self):
@@ -545,6 +545,7 @@ class DockerTop:
         total_cpu = 0.0
         mem_used = mem_limit = 0.0
         projects = set()
+        running_projects = set()
         for project, containers in self.groups.items():
             if project:
                 projects.add(project)
@@ -553,6 +554,8 @@ class DockerTop:
                 st = c.get('State', '')
                 if st == 'running':
                     running_ct += 1
+                    if project:
+                        running_projects.add(project)
                 elif st == 'paused':
                     paused_ct += 1
                 stats = c.get('Stats')
@@ -568,10 +571,10 @@ class DockerTop:
                         mem_limit += self._parse_size(parts[1])
         if mem_limit == 0:
             mem_limit = 1
-        return running_ct, total_ct, paused_ct, total_cpu, mem_used, mem_limit, len(projects)
+        return running_ct, total_ct, paused_ct, total_cpu, mem_used, mem_limit, len(projects), len(running_projects)
 
     def draw_header(self, w):
-        running, total, paused, cpu, mused, mlimit, pcount = self._compute_metrics()
+        running, total, paused, cpu, mused, mlimit, pcount, rprojects = self._compute_metrics()
         mem_pct = min(100, mused / mlimit * 100) if mlimit > 0 else 0
 
         def meter(y, label, pct, text):
@@ -580,33 +583,30 @@ class DockerTop:
             bar_w = max(3, w - len(prefix) - len(text_part) - 1)
             filled = round(pct / 100 * bar_w)
             try:
-                self.stdscr.addstr(y, 0, prefix, curses.color_pair(6))
+                self.stdscr.addstr(y, 0, prefix, curses.A_BOLD)
                 if filled:
                     self.stdscr.addstr(y, len(prefix), '|' * filled, curses.color_pair(2) | curses.A_BOLD)
                 if bar_w - filled:
-                    self.stdscr.addstr(y, len(prefix) + filled, ' ' * (bar_w - filled), curses.color_pair(6))
-                self.stdscr.addstr(y, len(prefix) + bar_w, text_part, curses.color_pair(6))
+                    self.stdscr.addstr(y, len(prefix) + filled, ' ' * (bar_w - filled), curses.A_NORMAL)
+                self.stdscr.addstr(y, len(prefix) + bar_w, text_part, curses.A_NORMAL)
             except Exception:
                 line = f"{prefix}{'|' * filled}{' ' * (bar_w - filled)}{text_part}"
-                self.stdscr.addstr(y, 0, line[:w], curses.color_pair(6))
+                self.stdscr.addstr(y, 0, line[:w], curses.A_NORMAL)
 
         if self.tab == 0:
-            rpct = min(100, running / max(1, total) * 100) if total else 0
-            meter(0, "Cont", rpct, f"{running}/{total}")
-            meter(1, "Cpu ", min(100, cpu), f"{cpu:.1f}%")
+            meter(0, "Cpu ", min(100, cpu), f"{cpu:.1f}%")
             mused_s = f"{mused / 1024**3:.1f}G" if mused > 1024**3 else f"{mused / 1024**2:.0f}M"
             mlim_s = f"{mlimit / 1024**3:.1f}G" if mlimit > 1024**3 else f"{mlimit / 1024**2:.0f}M"
-            meter(2, "Mem ", mem_pct, f"{mused_s}/{mlim_s}")
+            meter(1, "Mem ", mem_pct, f"{mused_s}/{mlim_s}")
         else:
-            meter(0, "Img ", 0, f"{len(self._bg_images)}")
-            meter(1, "Cpu ", 0, "─")
-            meter(2, "Mem ", 0, "─")
+            meter(0, "Cpu ", 0, "─")
+            meter(1, "Mem ", 0, "─")
 
         # status line — htop-style info line
         if self.tab == 0:
             status = (f"Containers: {total} total, {running} running"
                       f"{f', {paused} paused' if paused else ''}"
-                      f"  |  Projects: {pcount}"
+                      f"  |  Projects: {pcount}, {rprojects} running"
                       f"  |  Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
         else:
             sel = len(self._sel_images)
@@ -616,7 +616,7 @@ class DockerTop:
         if len(status) > w:
             status = status[:w]
         try:
-            self.stdscr.addstr(3, 0, status, curses.color_pair(6))
+            self.stdscr.addstr(2, 0, status, curses.A_DIM)
         except Exception:
             pass
 
@@ -633,15 +633,15 @@ class DockerTop:
         try:
             x = 0
             for i, label in enumerate(tab_labels):
-                entry = f" {label} "
+                entry = f"  {label}  "
                 if i == self.tab:
-                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.color_pair(6) | curses.A_REVERSE)
+                    self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.A_REVERSE)
                 else:
                     self.stdscr.addstr(self.hdr_h - 1, x, entry, curses.A_DIM)
                 x += len(entry)
         except Exception:
-            tab_line = " ".join(f"[{l}]" if i == self.tab else f" {l} " for i, l in enumerate(tab_labels))
-            self.stdscr.addstr(self.hdr_h - 1, 0, tab_line[:w], curses.color_pair(6))
+            tab_line = "  ".join(f"[{l}]" if i == self.tab else f" {l} " for i, l in enumerate(tab_labels))
+            self.stdscr.addstr(self.hdr_h - 1, 0, tab_line[:w], curses.A_NORMAL)
 
         # build display lines
         self.display_lines = self.build_display_lines()
@@ -802,7 +802,7 @@ class DockerTop:
             if len(fkeys) > w:
                 fkeys = fkeys[:w]
             try:
-                self.stdscr.addstr(h - ft, 0, fkeys, curses.color_pair(6))
+                self.stdscr.addstr(h - ft, 0, fkeys, curses.A_REVERSE)
             except Exception:
                 pass
 

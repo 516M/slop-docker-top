@@ -527,8 +527,11 @@ class DockerTop:
         try:
             subprocess.run(cmd_list, check=False)
         finally:
+            # fully re-initialize curses after suspend
+            self.stdscr = curses.initscr()
             curses.cbreak()
             curses.noecho()
+            self.stdscr.keypad(1)
             self.stdscr.nodelay(1)
             try:
                 curses.curs_set(0)

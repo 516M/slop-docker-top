@@ -155,6 +155,7 @@ class DockerTop:
         self._loading = True
         self.tab = 0
         self._collapsed = False
+        self.scroll_x = 0
 
         curses.start_color()
         curses.use_default_colors()
@@ -445,6 +446,8 @@ class DockerTop:
 
     def draw_cols(self, w, y, x, width):
         cols = (f"{'#':<4} {'ID':<12} {'NAME':<14} {'STATUS':<8} {'CPU%':>5} {'MEM%':>5} {'MEM USAGE':<10} {'PORTS':<12}{'PIDS':>4}")
+        if self.scroll_x:
+            cols = cols[self.scroll_x:]
         try:
             w.addstr(y, x, cols[:width].ljust(width), curses.color_pair(16))
         except Exception:
@@ -460,15 +463,12 @@ class DockerTop:
         suffix = f"{pids:>4}"
         fmt = prefix + port_str + suffix
 
-        if selected:
-            # fill the entire line width with reverse background
-            try:
-                w.addstr(y, x, fmt.ljust(width)[:width], curses.A_REVERSE)
-            except Exception:
-                pass
-            return
+        if self.scroll_x:
+            fmt = fmt[self.scroll_x:]
 
-        if pending:
+        if selected:
+            attr = curses.A_REVERSE
+        elif pending:
             if stat.startswith('Stopping'):
                 attr = curses.color_pair(3) | curses.A_BOLD
             elif stat.startswith('Starting'):
@@ -485,12 +485,9 @@ class DockerTop:
             attr = curses.A_NORMAL
 
         try:
-            # normal (non-selected): PORTS in cyan
-            w.addstr(y, x, prefix, attr)
-            w.addstr(y, x + len(prefix), port_str, curses.color_pair(1))
-            w.addstr(y, x + len(prefix) + len(port_str), suffix, attr)
+            w.addstr(y, x, fmt.ljust(width)[:width], attr)
         except Exception:
-            w.addstr(y, x, fmt, attr)
+            pass
 
     def _is_selectable(self, lt):
         return lt in ('row', 'pheader', 'irow')
@@ -876,6 +873,8 @@ class DockerTop:
                 self.draw_cols(self.stdscr, self.hdr_h - 1, 0, w)
             else:
                 cols = "#   REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
+                if self.scroll_x:
+                    cols = cols[self.scroll_x:]
                 self.stdscr.addstr(self.hdr_h - 1, 0, cols[:w].ljust(w), curses.color_pair(16))
         except Exception:
             pass
@@ -932,9 +931,12 @@ class DockerTop:
                         attr = curses.A_REVERSE
                     if self._collapsed:
                         lineno += 1
-                        self.stdscr.addstr(yy, 0, (f"{lineno:<4} {text}").ljust(w)[:w], attr)
+                        line = f"{lineno:<4} {text}"
                     else:
-                        self.stdscr.addstr(yy, 0, ("    " + str(text)).ljust(w)[:w], attr)
+                        line = "    " + str(text)
+                    if self.scroll_x:
+                        line = line[self.scroll_x:]
+                    self.stdscr.addstr(yy, 0, line.ljust(w)[:w], attr)
                 elif lt == 'sheader':
                     text, has_running = data
                     if has_running:
@@ -945,9 +947,12 @@ class DockerTop:
                         attr = curses.A_REVERSE
                     if self._collapsed:
                         lineno += 1
-                        self.stdscr.addstr(yy, 0, (f"{lineno:<4} {text}").ljust(w)[:w], attr)
+                        line = f"{lineno:<4} {text}"
                     else:
-                        self.stdscr.addstr(yy, 0, ("    " + str(text)).ljust(w)[:w], attr)
+                        line = "    " + str(text)
+                    if self.scroll_x:
+                        line = line[self.scroll_x:]
+                    self.stdscr.addstr(yy, 0, line.ljust(w)[:w], attr)
                 elif lt == 'colhdr':
                     self.draw_cols(self.stdscr, yy, 0, w)
                 elif lt == 'row':
@@ -973,32 +978,26 @@ class DockerTop:
                     iid = iid[:19].ljust(19) if len(iid) > 19 else iid.ljust(19)
                     size_s = str(size)[:14].ljust(14) if len(str(size)) > 14 else str(size).ljust(14)
                     created_s = str(created)[:14].ljust(14) if len(str(created)) > 14 else str(created).ljust(14)
-                    fmt = f"{lineno:<4} {repo} {tag} {iid} {size_s} {created_s}"
+                    fmt = flag + f"{lineno:<4} {repo} {tag} {iid} {size_s} {created_s}"
+                    if self.scroll_x:
+                        fmt = fmt[self.scroll_x:]
                     if abs_idx == self.selected_idx:
-                        flag = " " + chr(0x2502)
-                        if sel_state:
-                            flag = ">" + chr(0x2502)
-                        self.stdscr.addstr(yy, 0, flag, curses.A_REVERSE)
-                        self.stdscr.addstr(yy, 2, fmt.ljust(w - 2)[:w - 2], curses.A_REVERSE)
+                        attr = curses.A_REVERSE
                     elif sel_state:
-                        fmt = fmt[:w - 2]
                         attr = curses.color_pair(4) | curses.A_BOLD
-                        try:
-                            self.stdscr.addstr(yy, 0, flag, attr)
-                            self.stdscr.addstr(yy, 2, fmt, attr)
-                        except Exception:
-                            pass
                     else:
-                        fmt = fmt[:w - 2]
-                        try:
-                            self.stdscr.addstr(yy, 0, flag, curses.A_NORMAL)
-                            self.stdscr.addstr(yy, 2, fmt, curses.A_NORMAL)
-                        except Exception:
-                            pass
+                        attr = curses.A_NORMAL
+                    try:
+                        self.stdscr.addstr(yy, 0, fmt.ljust(w)[:w], attr)
+                    except Exception:
+                        pass
                 elif lt == 'blank':
                     pass
                 elif lt == 'empty':
-                    self.stdscr.addstr(yy, 0, ("    " + str(data))[:w], curses.A_DIM)
+                    text = "    " + str(data)
+                    if self.scroll_x:
+                        text = text[self.scroll_x:]
+                    self.stdscr.addstr(yy, 0, text[:w], curses.A_DIM)
             except Exception:
                 pass
 
@@ -1439,6 +1438,12 @@ class DockerTop:
 
         elif key in (ord('H'),):
             self._collapsed = not self._collapsed
+
+        # horizontal scrolling
+        elif key == curses.KEY_RIGHT:
+            self.scroll_x = min(self.scroll_x + 8, 200)
+        elif key == curses.KEY_LEFT:
+            self.scroll_x = max(self.scroll_x - 8, 0)
 
         elif key in (ord('h'), ord('?')):
             self.show_help()

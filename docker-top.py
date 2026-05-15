@@ -144,6 +144,7 @@ class DockerTop:
         self.container_count = 0
         self._loading = True
         self.tab = 0  # 0 = Main, 1 = Images
+        self._collapsed = False
 
         curses.start_color()
         curses.use_default_colors()
@@ -320,13 +321,18 @@ class DockerTop:
             lines.append(('blank', ''))
             if project:
                 header = f" Project: {project}"
-                lines.append(('pheader', header))
+                running_in_proj = any(c.get('State') == 'running' for c in fcontainers)
+                lines.append(('pheader', (header, running_in_proj)))
             else:
                 header = " Standalone containers"
-                lines.append(('sheader', header))
+                running_in_proj = any(c.get('State') == 'running' for c in fcontainers)
+                lines.append(('sheader', (header, running_in_proj)))
 
             if not fcontainers:
                 lines.append(('empty', '  (none match filter)'))
+                continue
+
+            if self._collapsed:
                 continue
 
             for c in fcontainers:
@@ -476,7 +482,8 @@ class DockerTop:
             if lt == 'row':
                 return ('container', data)
             if lt == 'pheader':
-                raw = str(data).strip()
+                text, _ = data
+                raw = str(text).strip()
                 if raw.startswith('Project: '):
                     return ('project', raw[len('Project: '):])
                 return ('project', raw)
@@ -862,15 +869,23 @@ class DockerTop:
 
             try:
                 if lt == 'pheader':
-                    attr = curses.color_pair(4) | curses.A_BOLD
+                    text, has_running = data
+                    if has_running:
+                        attr = curses.color_pair(4) | curses.A_BOLD
+                    else:
+                        attr = curses.A_DIM | curses.color_pair(4)
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
-                    self.stdscr.addstr(yy, 0, str(data).ljust(w)[:w], attr)
+                    self.stdscr.addstr(yy, 0, str(text).ljust(w)[:w], attr)
                 elif lt == 'sheader':
-                    attr = curses.A_DIM
+                    text, has_running = data
+                    if has_running:
+                        attr = curses.color_pair(4) | curses.A_NORMAL
+                    else:
+                        attr = curses.color_pair(4) | curses.A_DIM
                     if abs_idx == self.selected_idx:
                         attr = curses.A_REVERSE
-                    self.stdscr.addstr(yy, 0, str(data).ljust(w)[:w], attr)
+                    self.stdscr.addstr(yy, 0, str(text).ljust(w)[:w], attr)
                 elif lt == 'sep':
                     pass
                 elif lt == 'colhdr':
@@ -1006,10 +1021,10 @@ class DockerTop:
         else:
             if self.tab == 0:
                 fkey_groups = [
-                    ("h", "Help"), ("f", "Filter"), ("e", "Sh"),
-                    ("l", "Logs"), ("i", "Insp"), ("s", "Stop"),
-                    ("S", "Start"), ("R", "Rest"), ("d", "Del"),
-                    ("q", "Quit"),
+                    ("h", "Help"), ("f", "Filter"), ("H", "Coll"),
+                    ("e", "Sh"), ("l", "Logs"), ("i", "Insp"),
+                    ("s", "Stop"), ("S", "Start"), ("R", "Rest"),
+                    ("d", "Del"), ("q", "Quit"),
                 ]
             else:
                 fkey_groups = [
@@ -1104,10 +1119,10 @@ class DockerTop:
         else:
             if self.tab == 0:
                 fkey_groups = [
-                    ("h", "Help"), ("f", "Filter"), ("e", "Sh"),
-                    ("l", "Logs"), ("i", "Insp"), ("s", "Stop"),
-                    ("S", "Start"), ("R", "Rest"), ("d", "Del"),
-                    ("q", "Quit"),
+                    ("h", "Help"), ("f", "Filter"), ("H", "Coll"),
+                    ("e", "Sh"), ("l", "Logs"), ("i", "Insp"),
+                    ("s", "Stop"), ("S", "Start"), ("R", "Rest"),
+                    ("d", "Del"), ("q", "Quit"),
                 ]
             else:
                 fkey_groups = [
@@ -1430,8 +1445,12 @@ class DockerTop:
                     self._sel_images.add(iid_short)
 
         # help
-        elif key in (ord('h'), ord('H'), ord('?')):
+        elif key in (ord('h'), ord('?')):
             self.show_help()
+
+        # toggle collapse (Shift+H)
+        elif key in (ord('H'),):
+            self._collapsed = not self._collapsed
 
         elif key == curses.KEY_RESIZE:
             pass
@@ -1479,7 +1498,8 @@ class DockerTop:
             "  r               Force refresh data",
             "  q / :q          Quit",
             "  :               Command mode (press q after :)",
-            "  h / H / ?       Show this help",
+            "  h / ?           Show this help",
+            "  H               Toggle collapse project containers",
             "",
             " Press any key to close help",
         ]

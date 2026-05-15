@@ -311,18 +311,15 @@ class DockerTop:
             else:
                 header = " Standalone containers"
                 lines.append(('sheader', header))
-            lines.append(('sep', ''))
 
             if not fcontainers:
                 lines.append(('empty', '  (none match filter)'))
-                lines.append(('spacer', ''))
                 continue
 
             lines.append(('colhdr', ''))
             for c in fcontainers:
                 lines.append(('row', c))
                 self.container_count += 1
-            lines.append(('spacer', ''))
 
         if not lines:
             if self._loading:
@@ -400,7 +397,7 @@ class DockerTop:
         except Exception:
             pass
 
-    def draw_row(self, w, y, x, width, row_data, selected=False, zebra=False):
+    def draw_row(self, w, y, x, width, row_data, selected=False):
         cid, name, stat, state, cpu_bar, mem_bar, mem_u, net, blk, pids, ports, image, pending = row_data
         n = name[:22].ljust(22) if len(name) > 22 else name.ljust(22)
         c = cid[:12].ljust(12)
@@ -411,8 +408,6 @@ class DockerTop:
 
         if selected:
             attr = curses.color_pair(12)
-        elif zebra:
-            attr = curses.color_pair(11)
         elif pending:
             attr = curses.color_pair(4) | curses.A_BOLD
         elif state in ('running',):
@@ -579,12 +574,14 @@ class DockerTop:
     def draw_header(self, w):
         running, total, paused, cpu, mused, mlimit, pcount = self._compute_metrics()
         mem_pct = min(100, mused / mlimit * 100) if mlimit > 0 else 0
-        bar_w = max(10, w - 38)
 
         def meter(y, label, pct, text):
+            prefix = f"  {label}["
+            text_part = f"] {text}"
+            bar_w = max(3, w - len(prefix) - len(text_part) - 1)
             filled = round(pct / 100 * bar_w)
             bar = '#' * filled + ' ' * (bar_w - filled)
-            line = f" {label} [{bar}] {text}"
+            line = f"{prefix}{bar}{text_part}"
             if len(line) > w:
                 line = line[:w]
             try:
@@ -593,33 +590,32 @@ class DockerTop:
                 pass
 
         if self.tab == 0:
-            meter(0, "CONTAINERS", min(100, running / max(1, total) * 100),
-                  f"{running}/{total} running")
-            meter(1, "CPU       ", min(100, cpu), f"{cpu:.1f}%")
+            rpct = min(100, running / max(1, total) * 100) if total else 0
+            meter(0, "Cont", rpct, f"{running}/{total}")
+            meter(1, "Cpu ", min(100, cpu), f"{cpu:.1f}%")
             mused_s = f"{mused / 1024**3:.1f}G" if mused > 1024**3 else f"{mused / 1024**2:.0f}M"
             mlim_s = f"{mlimit / 1024**3:.1f}G" if mlimit > 1024**3 else f"{mlimit / 1024**2:.0f}M"
-            meter(2, "MEMORY    ", mem_pct, f"{mused_s}/{mlim_s}")
+            meter(2, "Mem ", mem_pct, f"{mused_s}/{mlim_s}")
         else:
-            img_count = len(self._bg_images)
-            meter(0, "IMAGES    ", 0, f"{img_count} total")
-            meter(1, "CPU       ", 0, "─")
-            meter(2, "MEMORY    ", 0, "─")
+            meter(0, "Img ", 0, f"{len(self._bg_images)}")
+            meter(1, "Cpu ", 0, "─")
+            meter(2, "Mem ", 0, "─")
 
-        # status line
+        # status line — htop-style info line
         if self.tab == 0:
-            status = (f" Tasks: {total} total, {running} running"
+            status = (f"Containers: {total} total, {running} running"
                       f"{f', {paused} paused' if paused else ''}"
                       f"  |  Projects: {pcount}"
                       f"  |  Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
         else:
             sel = len(self._sel_images)
-            status = (f" Images: {len(self._bg_images)} total"
+            status = (f"Images: {len(self._bg_images)} total"
                       f"{f', {sel} selected' if sel else ''}"
                       f"  |  Filter: {'\"' + self.filter_text + '\"' if self.filter_text else '(none)'}")
         if len(status) > w:
             status = status[:w]
         try:
-            self.stdscr.addstr(3, 0, status, curses.color_pair(6) | curses.A_DIM)
+            self.stdscr.addstr(3, 0, status, curses.color_pair(6))
         except Exception:
             pass
 
@@ -663,7 +659,6 @@ class DockerTop:
             except Exception:
                 pass
 
-        row_idx = 0
         for i, (lt, data) in enumerate(visible):
             yy = self.hdr_h + i
             if yy >= h - ft:
@@ -682,18 +677,13 @@ class DockerTop:
                         attr = curses.color_pair(12)
                     self.stdscr.addstr(yy, 0, str(data)[:w], attr)
                 elif lt == 'sep':
-                    sep = " \u2500" * ((w - 2) // 2)
-                    if len(sep) > w:
-                        sep = sep[:w]
-                    self.stdscr.addstr(yy, 0, sep[:w], curses.color_pair(5))
+                    pass
                 elif lt == 'colhdr':
                     self.draw_cols(self.stdscr, yy, 0, w)
                 elif lt == 'row':
                     row = self.render_row(data)
                     self.draw_row(self.stdscr, yy, 0, w, row,
-                                  selected=(abs_idx == self.selected_idx),
-                                  zebra=(row_idx % 2 == 0))
-                    row_idx += 1
+                                  selected=(abs_idx == self.selected_idx))
                 elif lt == 'icolhdr':
                     cols = " REPOSITORY               TAG                 IMAGE ID             SIZE          CREATED"
                     if len(cols) > w:
@@ -719,8 +709,6 @@ class DockerTop:
                         attr = curses.color_pair(12)
                     elif sel_state:
                         attr = curses.color_pair(4) | curses.A_BOLD
-                    elif row_idx % 2 == 0:
-                        attr = curses.color_pair(11)
                     else:
                         attr = curses.A_NORMAL
                     try:
@@ -728,8 +716,6 @@ class DockerTop:
                         self.stdscr.addstr(yy, 2, fmt, attr)
                     except Exception:
                         pass
-                elif lt == 'spacer':
-                    pass
                 elif lt == 'empty':
                     self.stdscr.addstr(yy, 0, str(data)[:w], curses.A_DIM)
             except Exception:
